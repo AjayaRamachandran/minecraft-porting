@@ -3,6 +3,7 @@
 Each module here represents one kind of input the user wants converted:
 
 - :mod:`.give_command` — generic ``/give <target> <item>{tag}`` lines (Level 1).
+- :mod:`.execute_command` — ``execute as @a[nbt={…tag:{…}…}]`` lines (tag→components).
 - :mod:`.villager_command` — ``/give @p villager_spawn_egg{…}`` lines with trades (Level 2).
 - :mod:`.summon_command` — ``/summon <mob> … {entity_nbt}`` lines (Level 2).
 - :mod:`.schematic_file` — ``.schem`` files (Level 3).

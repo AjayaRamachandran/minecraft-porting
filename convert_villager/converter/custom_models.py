@@ -1,9 +1,9 @@
-"""Custom-item model resolution: CMD lookup + fuzzy fallback.
+"""Custom-item model resolution: CMD lookup + nearest-CMD + fuzzy fallback.
 
 1.21+ replaces the old ``CustomModelData`` integer with a
 ``minecraft:item_model`` component pointing at a JSON file under
-``assets/<namespace>/items/`` in the resource pack. There are two ways to map
-an old item to the right new model:
+``assets/<namespace>/items/`` in the resource pack. There are three ways to
+map an old item to the right new model, tried in order:
 
 1. **CMD lookup (deterministic).** The old pack's
    ``assets/minecraft/models/item/<base>.json`` files contain an ``overrides``
@@ -12,16 +12,21 @@ an old item to the right new model:
    (``darkpick``), and use it directly if the new pack has the matching
    ``items/custom/darkpick.json``. This is essentially failure-free as long as
    both packs are in sync.
-2. **Fuzzy match (fallback).** When the CMD is missing from the old pack's
-   overrides, or the resolved stem doesn't exist in the new pack, fall back to
-   comparing the item's display-name text against the new pack's custom
-   filenames. Candidates are first restricted by base-item type
+2. **Nearest-CMD (Minecraft-native fallback).** When the exact CMD is absent
+   from the old pack's overrides, or its stem is missing from the new pack,
+   find the closest CMD value for the same base item whose stem *does* exist in
+   the new pack. Minecraft's own predicate selection uses the largest CMD ≤ the
+   item's value, so this tier mirrors that behaviour; it falls back to the
+   smallest CMD above the item's value if nothing is ≤.
+3. **Fuzzy match (last resort).** When neither CMD tier produces a hit,
+   compare the item's display-name text against the new pack's custom filenames.
+   Candidates are first restricted by base-item type
    (:data:`BASE_TYPE_KEYWORDS`) to avoid implausible cross-type hits.
 
 Public surface:
 - :func:`load_custom_index` — list of stems in the new pack's ``items/custom/``.
 - :func:`load_cmd_override_map` — ``(base, cmd) → stem`` from the old pack.
-- :class:`CustomModelResolver` — combined resolver (CMD then fuzzy).
+- :class:`CustomModelResolver` — combined resolver (CMD → nearest-CMD → fuzzy).
 - :func:`find_custom_model` — low-level fuzzy matcher (used by the resolver).
 """
 
@@ -166,17 +171,21 @@ class ResolveResult:
         Filename stem in the new pack's ``items/custom/`` (e.g. ``"darkpick"``),
         or ``None`` if even fuzzy matching couldn't produce a candidate.
     source:
-        ``"cmd"`` — deterministic lookup hit; ``"fuzzy"`` — fuzzy match (no CMD
-        info or CMD missing from old pack); ``"fuzzy-fallback"`` — CMD pointed
-        at a stem that doesn't exist in the new pack, fuzzy result returned
-        instead.
+        ``"cmd"`` — exact CMD lookup hit;
+        ``"nearest-cmd"`` — exact CMD absent or its stem missing from new pack,
+        resolved via nearest CMD for the same base item (mirrors Minecraft's own
+        predicate selection);
+        ``"fuzzy"`` — no CMD info or no CMD coverage for this base item, fell
+        back to display-name matching;
+        ``"fuzzy-fallback"`` — exact CMD pointed at a stem that doesn't exist in
+        the new pack *and* no nearest-CMD candidate was found, fuzzy only.
     score:
-        1.0 for ``cmd``; the SequenceMatcher ratio for fuzzy variants.
+        1.0 for ``cmd`` and ``nearest-cmd``; the SequenceMatcher ratio for
+        fuzzy variants.
     restricted:
         Whether the fuzzy candidate pool was restricted by base-type keywords.
     note:
-        Extra diagnostic context, used when fuzzy fallback happened after a
-        CMD hit failed to map into the new pack.
+        Extra diagnostic context (nearest-CMD distance or fuzzy-fallback reason).
     """
 
     stem: Optional[str]
@@ -205,6 +214,35 @@ class CustomModelResolver:
         self.cmd_map: dict[tuple[str, int], str] = (
             load_cmd_override_map(old_pack_dir) if old_pack_dir else {}
         )
+        # Per-base sorted list of (cmd, stem) pairs whose stem exists in the
+        # new pack.  Used for nearest-CMD resolution.
+        self._cmd_by_base: dict[str, list[tuple[int, str]]] = {}
+        for (base, cmd), stem in self.cmd_map.items():
+            if stem in self._new_index_set:
+                self._cmd_by_base.setdefault(base, []).append((cmd, stem))
+        for lst in self._cmd_by_base.values():
+            lst.sort()
+
+    def _nearest_cmd_stem(self, base: str, cmd_int: int) -> Optional[tuple[str, int]]:
+        """Return ``(stem, matched_cmd)`` for the nearest CMD that maps to a stem
+        present in the new pack.
+
+        Prefers the largest CMD ≤ ``cmd_int`` (Minecraft's own predicate
+        selection), falling back to the smallest CMD > ``cmd_int`` if none
+        exists below.
+        """
+        candidates = self._cmd_by_base.get(base)
+        if not candidates:
+            return None
+        below = [(cmd, stem) for cmd, stem in candidates if cmd <= cmd_int]
+        if below:
+            cmd, stem = max(below, key=lambda x: x[0])
+            return stem, cmd
+        above = [(cmd, stem) for cmd, stem in candidates if cmd > cmd_int]
+        if above:
+            cmd, stem = min(above, key=lambda x: x[0])
+            return stem, cmd
+        return None
 
     def resolve(self, item_id: str, cmd_value, display_text: str) -> ResolveResult:
         """Resolve a (base item, optional CMD, display name) tuple to a new-pack stem.
@@ -222,11 +260,27 @@ class CustomModelResolver:
 
         if cmd_int is not None and self.cmd_map:
             base = item_id.split(":", 1)[-1]
-            stem = self.cmd_map.get((base, cmd_int))
-            if stem is not None:
-                if stem in self._new_index_set:
-                    return ResolveResult(stem, source="cmd", score=1.0)
-                # CMD known in old pack but stem missing in new pack.
+            exact_stem = self.cmd_map.get((base, cmd_int))
+            if exact_stem is not None and exact_stem in self._new_index_set:
+                return ResolveResult(exact_stem, source="cmd", score=1.0)
+
+            # Exact CMD missing or its stem absent from new pack — try the
+            # nearest CMD for this base item that does exist in the new pack.
+            nearest = self._nearest_cmd_stem(base, cmd_int)
+            if nearest is not None:
+                near_stem, near_cmd = nearest
+                if exact_stem is None:
+                    note = f"CMD {cmd_int} not in old pack; nearest CMD {near_cmd}"
+                else:
+                    note = (f"CMD {cmd_int} → {exact_stem!r} not in new pack; "
+                            f"nearest CMD {near_cmd}")
+                return ResolveResult(
+                    near_stem, source="nearest-cmd", score=1.0, note=note
+                )
+
+            # No CMD-based candidate at all — fall through to fuzzy, but flag
+            # if we had an exact hit that just wasn't ported to the new pack.
+            if exact_stem is not None:
                 best, score, restricted = find_custom_model(
                     display_text, item_id, self.new_index
                 )
@@ -235,7 +289,7 @@ class CustomModelResolver:
                     source="fuzzy-fallback",
                     score=score,
                     restricted=bool(restricted),
-                    note=f"CMD {cmd_int} → {stem!r} not present in new pack",
+                    note=f"CMD {cmd_int} → {exact_stem!r} not present in new pack",
                 )
 
         best, score, restricted = find_custom_model(display_text, item_id, self.new_index)

@@ -156,6 +156,13 @@ class ItemConverter:
             if hidden:
                 comps["minecraft:tooltip_display"] = {"hidden_components": hidden}
 
+        # Any remaining unknown keys are custom item data (e.g. rune1:1b,
+        # boot1:1b) — preserve them in minecraft:custom_data so that
+        # selector-based nbt= checks can find them.
+        custom_data = {k: v for k, v in tag.items() if k not in self.KNOWN_TAG_FIELDS}
+        if custom_data:
+            comps["minecraft:custom_data"] = custom_data
+
         return dict(sorted(comps.items()))
 
     def convert_item_nbt(self, item_dict: dict, ctx: str) -> dict:
@@ -271,13 +278,18 @@ class ItemConverter:
             return
         comps["minecraft:item_model"] = Str(f"minecraft:custom/{result.stem}", '"')
 
-        # Deterministic CMD hits don't get a warning. Fuzzy fallbacks always
-        # do (note when CMD existed but the stem was missing); pure fuzzy hits
-        # only warn below the threshold.
+        # Deterministic CMD hits don't get a warning. Everything else does:
+        # nearest-cmd always (approximation); fuzzy-fallback always (missing
+        # asset); pure fuzzy only when below the confidence threshold.
         if result.source == "cmd":
             return
         cmd_repr = getattr(cmd_value, "value", cmd_value)
-        if result.source == "fuzzy-fallback":
+        if result.source == "nearest-cmd":
+            self.warnings.append(
+                f"[{ctx}] {result.note} -> {result.stem} "
+                f"(id={item_id}, cmd={cmd_repr})"
+            )
+        elif result.source == "fuzzy-fallback":
             self.warnings.append(
                 f"[{ctx}] {result.note}; fuzzy fallback for '{display_text}' "
                 f"(id={item_id}, cmd={cmd_repr}) -> {result.stem} "

@@ -23,6 +23,7 @@ import sys
 from pathlib import Path
 
 from .implementors import (
+    execute_command,
     give_command,
     schematic_file,
     spawner_command,
@@ -52,6 +53,7 @@ def build_pipeline(pack_dir, threshold: float, old_pack_dir=None) -> ConverterPi
     pipeline.register_line_implementor(spawner_command.try_convert_line)
     pipeline.register_line_implementor(summon_command.try_convert_line)
     pipeline.register_line_implementor(give_command.try_convert_line)
+    pipeline.register_line_implementor(execute_command.try_convert_line)
     return pipeline
 
 
@@ -156,6 +158,7 @@ def run_schematic(description: str, argv=None) -> None:
     pipeline.register_line_implementor(spawner_command.try_convert_line)
     pipeline.register_line_implementor(summon_command.try_convert_line)
     pipeline.register_line_implementor(give_command.try_convert_line)
+    pipeline.register_line_implementor(execute_command.try_convert_line)
 
     if args.input:
         if not args.output:

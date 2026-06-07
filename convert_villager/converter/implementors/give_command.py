@@ -14,7 +14,7 @@ from __future__ import annotations
 from typing import Optional
 
 from ..command_parsing import GIVE_RE, split_top_level_nbt
-from ..snbt import snbt_parse
+from ..snbt import Str, snbt_parse
 
 
 def try_convert_line(line: str, pipeline) -> Optional[str]:
@@ -41,7 +41,34 @@ def try_convert_line(line: str, pipeline) -> Optional[str]:
     tag = snbt_parse(nbt_text)
     if not isinstance(tag, dict):
         return None
+
+    # Strip special structural keys before Level 1 so they don't land in custom_data.
+    entity_tag = tag.pop("EntityTag", None)
+    block_entity_tag = tag.pop("BlockEntityTag", None)
+
     item_id = f"minecraft:{item}" if ":" not in item else item
     comps = pipeline.item.convert_tag_to_components(tag, item_id, ctx=f"give/{item}")
-    block = pipeline.item.render_components_bracket(comps)
+
+    if isinstance(entity_tag, dict):
+        eid = item_id
+        ed_input = {"id": Str(eid, '"'), **entity_tag}
+        comps["minecraft:entity_data"] = pipeline.entity.convert_entity_nbt(
+            ed_input, eid, ctx=f"give/{item}/EntityTag"
+        )
+
+    if isinstance(block_entity_tag, dict):
+        # Convert any items stored inside the block entity (e.g. shulker box contents).
+        new_be: dict = {}
+        for k, v in block_entity_tag.items():
+            if k == "Items" and isinstance(v, list):
+                new_be[k] = [
+                    pipeline.item.convert_item_nbt(it, f"give/{item}/BlockEntityTag.Items[{i}]")
+                    if isinstance(it, dict) and "id" in it else it
+                    for i, it in enumerate(v)
+                ]
+            else:
+                new_be[k] = v
+        comps["minecraft:block_entity_data"] = new_be
+
+    block = pipeline.item.render_components_bracket(dict(sorted(comps.items())))
     return f"give {m.group('target')} {item}{block}{trailing}"
