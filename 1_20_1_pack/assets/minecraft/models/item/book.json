@@ -1,0 +1,37 @@
+{
+  "parent": "item/generated",
+  "textures": {
+      "layer0": "item/book"
+  },
+"overrides": 
+[
+  { "predicate": { "custom_model_data": 1}, "model": "custom/sapscroll"},
+  { "predicate": { "custom_model_data": 2}, "model": "custom/mastertome"},
+  { "predicate": { "custom_model_data": 3}, "model": "custom/book6"},
+  { "predicate": { "custom_model_data": 4}, "model": "custom/book7"},
+
+  { "predicate": { "custom_model_data": 3001}, "model": "custom/bluebook"},	
+  { "predicate": { "custom_model_data": 3002}, "model": "custom/blackbook"},
+
+  { "predicate": { "custom_model_data": 4101}, "model": "custom/fort"},
+  { "predicate": { "custom_model_data": 4102}, "model": "custom/h1"},
+  { "predicate": { "custom_model_data": 4103}, "model": "custom/h2"},
+  { "predicate": { "custom_model_data": 4104}, "model": "custom/h3"},
+  { "predicate": { "custom_model_data": 4105}, "model": "custom/castle"},
+  { "predicate": { "custom_model_data": 4106}, "model": "custom/dungeon"},
+  { "predicate": { "custom_model_data": 4107}, "model": "custom/kingdom"},
+  { "predicate": { "custom_model_data": 4108}, "model": "custom/spawner"},
+  { "predicate": { "custom_model_data": 4150}, "model": "custom/schem"},
+
+  { "predicate": { "custom_model_data": 5310}, "model": "custom/attributes"},
+  { "predicate": { "custom_model_data": 17000}, "model": "custom/book0"},		
+  { "predicate": { "custom_model_data": 17001}, "model": "custom/book1"},	
+  { "predicate": { "custom_model_data": 17002}, "model": "custom/book2"},	
+  { "predicate": { "custom_model_data": 17003}, "model": "custom/book3"},	
+  { "predicate": { "custom_model_data": 17004}, "model": "custom/book4"},	
+  { "predicate": { "custom_model_data": 17005}, "model": "custom/book5"},	
+  { "predicate": { "custom_model_data": 17006}, "model": "custom/scroll"},	
+  { "predicate": { "custom_model_data": 17007}, "model": "custom/mission"}	
+]
+
+}

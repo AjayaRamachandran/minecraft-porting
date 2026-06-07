@@ -1,0 +1,14 @@
+{
+  "parent": "minecraft:item/generated",
+  "textures": {
+    "layer0": "minecraft:item/potion_overlay"
+  },
+  "overrides":
+  [
+    { "predicate": { "custom_model_data": 17100}, "model": "custom/refresh"},
+    { "predicate": { "custom_model_data": 17101}, "model": "custom/potion1"},
+    { "predicate": { "custom_model_data": 17102}, "model": "custom/potion2"},
+    { "predicate": { "custom_model_data": 17103}, "model": "custom/potion3"},		
+    { "predicate": { "custom_model_data": 17104}, "model": "custom/potion4"}	
+  ]
+}

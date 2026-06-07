@@ -1,0 +1,15 @@
+{
+  "parent": "minecraft:item/handheld",
+  "textures": {
+    "layer0": "minecraft:item/diamond_hoe"
+  },
+"overrides": 
+[
+  { "predicate": { "custom_model_data": 1}, "model": "custom/prihoe"},
+
+  { "predicate": { "custom_model_data": 231}, "model": "custom/orangehoe"},
+  { "predicate": { "custom_model_data": 232}, "model": "custom/redhoe"},
+  { "predicate": { "custom_model_data": 632}, "model": "custom/frostscythe"}
+]
+
+}

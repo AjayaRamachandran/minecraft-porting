@@ -1,0 +1,40 @@
+{
+  "parent": "item/generated",
+  "textures": {
+      "layer0": "item/flint"
+  },
+"overrides": 
+[
+  { "predicate": { "custom_model_data": 1}, "model": "custom/greenwood"},
+  { "predicate": { "custom_model_data": 2}, "model": "custom/leaf"},
+  { "predicate": { "custom_model_data": 3}, "model": "custom/pri"},
+  { "predicate": { "custom_model_data": 4}, "model": "custom/prishard"},
+
+  { "predicate": { "custom_model_data": 3003}, "model": "custom/scaleitem"},
+  { "predicate": { "custom_model_data": 3004}, "model": "custom/onyx"},
+
+  { "predicate": { "custom_model_data": 4151}, "model": "custom/sp"},
+  { "predicate": { "custom_model_data": 4152}, "model": "custom/dp"},
+  { "predicate": { "custom_model_data": 4153}, "model": "custom/op"},
+  { "predicate": { "custom_model_data": 4154}, "model": "custom/ap"},
+  { "predicate": { "custom_model_data": 4155}, "model": "custom/wp"},
+  { "predicate": { "custom_model_data": 4156}, "model": "custom/bp"},
+  { "predicate": { "custom_model_data": 4157}, "model": "custom/ur"},
+  { "predicate": { "custom_model_data": 4158}, "model": "custom/sr"},
+  { "predicate": { "custom_model_data": 4159}, "model": "custom/wheat"},
+  { "predicate": { "custom_model_data": 4160}, "model": "custom/special"},
+  { "predicate": { "custom_model_data": 4161}, "model": "custom/holy"},
+
+  { "predicate": { "custom_model_data": 7004}, "model": "custom/runeshard"},
+
+  { "predicate": { "custom_model_data": 17011}, "model": "custom/rune1"},	
+  { "predicate": { "custom_model_data": 17012}, "model": "custom/rune2"},	
+  { "predicate": { "custom_model_data": 17013}, "model": "custom/rune3"},	
+  { "predicate": { "custom_model_data": 17014}, "model": "custom/rune4"},	
+  { "predicate": { "custom_model_data": 17015}, "model": "custom/rune5"},	
+  { "predicate": { "custom_model_data": 17016}, "model": "custom/rune6"}		
+	
+
+]
+
+}

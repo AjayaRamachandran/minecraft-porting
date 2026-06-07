@@ -1,0 +1,20 @@
+{
+  "parent": "minecraft:item/handheld",
+  "textures": {
+    "layer0": "minecraft:item/iron_axe"
+  },
+    "overrides":
+	[
+  { "predicate": { "custom_model_data": 1}, "model": "custom/angelaxe"},
+
+  { "predicate": { "custom_model_data": 17065}, "model": "custom/thrasher"},	
+  { "predicate": { "custom_model_data": 17066}, "model": "custom/armads"},	
+  { "predicate": { "custom_model_data": 17067}, "model": "custom/steelleafaxe"},	
+  { "predicate": { "custom_model_data": 17068}, "model": "custom/mythaxe"},	
+  { "predicate": { "custom_model_data": 17069}, "model": "custom/aerial"},	
+    {"predicate": {"custom_model_data": 6680001},"model": "custom/steelbattleaxe"},
+    {"predicate": {"custom_model_data": 6780001},"model": "custom/raxe"},
+    {"predicate": {"custom_model_data": 6780002},"model": "custom/tsaxe"}
+
+    ]
+}

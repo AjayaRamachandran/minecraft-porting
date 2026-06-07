@@ -1,0 +1,30 @@
+{
+  "parent": "minecraft:item/handheld",
+  "textures": {
+    "layer0": "minecraft:item/diamond_axe"
+  },
+    "overrides":
+	[
+        {"predicate": {"custom_model_data": 1},"model": "custom/leadaxe"},
+    {"predicate": {"custom_model_data": 2},"model": "custom/platinumaxe"},
+    {"predicate": {"custom_model_data": 3},"model": "custom/silveraxe"},
+    {"predicate": {"custom_model_data": 4},"model": "custom/tinaxe"},
+    {"predicate": {"custom_model_data": 5},"model": "custom/tungstenaxe"},
+    {"predicate": {"custom_model_data": 6},"model": "custom/zincaxe"},
+    {"predicate": {"custom_model_data": 7},"model": "custom/faxe"},
+    {"predicate": {"custom_model_data": 8},"model": "custom/priaxe"},
+    {"predicate": {"custom_model_data": 9},"model": "custom/minotaur"},
+    {"predicate": {"custom_model_data": 10},"model": "custom/mushaxe"},
+
+{"predicate": {"custom_model_data": 235},"model": "custom/redaxe"},
+    {"predicate": {"custom_model_data": 236},"model": "custom/orangeaxe"},
+    {"predicate": {"custom_model_data": 6680001},"model": "custom/steelbattleaxe"},
+    {"predicate": {"custom_model_data": 6680002},"model": "custom/cobalthatchet"},
+    {"predicate": {"custom_model_data": 6680003},"model": "custom/koathianaxe"},
+    {"predicate": {"custom_model_data": 6680004},"model": "custom/malamace"},
+    {"predicate": {"custom_model_data": 6680005},"model": "custom/malaclub"},
+    {"predicate": {"custom_model_data": 6680006},"model": "custom/malaaxe"},
+    {"predicate": {"custom_model_data": 6680007},"model": "custom/malahatchet"}
+
+    ]
+}

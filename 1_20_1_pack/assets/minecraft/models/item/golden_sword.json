@@ -1,0 +1,51 @@
+{
+  "parent": "minecraft:item/handheld",
+  "textures": {
+    "layer0": "minecraft:item/golden_sword"
+  },
+"overrides": 
+[
+ 
+  { "predicate": { "custom_model_data": 201}, "model": "custom/alestia"},
+  { "predicate": { "custom_model_data": 3018}, "model": "custom/arsenaloflight"},
+  { "predicate": { "custom_model_data": 3019}, "model": "custom/aethersword"},
+  { "predicate": { "custom_model_data": 3020}, "model": "custom/embersword"},
+  { "predicate": { "custom_model_data": 3021}, "model": "custom/emberkingsword"},  
+  { "predicate": { "custom_model_data": 3022}, "model": "custom/npatron"},
+  { "predicate": { "custom_model_data": 3023}, "model": "custom/kidam"},
+  { "predicate": { "custom_model_data": 3024}, "model": "custom/duneblade"},
+  { "predicate": { "custom_model_data": 3025}, "model": "custom/duneknife"},
+  { "predicate": { "custom_model_data": 5312}, "model": "custom/cactus"},
+
+  { "predicate": { "custom_model_data": 7029}, "model": "custom/ultragoldsword"},
+  { "predicate": { "custom_model_data": 7030}, "model": "custom/daybreak"},
+
+  { "predicate": { "custom_model_data": 17082}, "model": "custom/endstone"},	
+  { "predicate": { "custom_model_data": 17083}, "model": "custom/goldensai"},	
+  { "predicate": { "custom_model_data": 17084}, "model": "custom/yellowlightsaber"},	
+  { "predicate": { "custom_model_data": 17085}, "model": "custom/startersword"},	
+  { "predicate": { "custom_model_data": 17086}, "model": "custom/botknife"},	
+  { "predicate": { "custom_model_data": 17087}, "model": "custom/corinthiumsword"},	
+  { "predicate": { "custom_model_data": 17088}, "model": "custom/electrumsword"},	
+  { "predicate": { "custom_model_data": 17089}, "model": "custom/redambersword"},	
+
+  { "predicate": { "custom_model_data": 99979}, "model": "custom/valiant_steel_cutlass"},
+  { "predicate": { "custom_model_data": 99980}, "model": "custom/valiant_steel_dagger"},
+  { "predicate": { "custom_model_data": 99990}, "model": "custom/vernium_cutlass"},
+  { "predicate": { "custom_model_data": 99991}, "model": "custom/vernium_dagger"},
+
+  { "predicate": { "custom_model_data": 6380001}, "model": "custom/zaiross"},
+  { "predicate": { "custom_model_data": 6380002}, "model": "custom/guildknight"},
+  { "predicate": { "custom_model_data": 6380003}, "model": "custom/bronzesword"},
+  { "predicate": { "custom_model_data": 6380004}, "model": "custom/valhallasword"},
+  { "predicate": { "custom_model_data": 6380005}, "model": "custom/dragonscalesword"},
+  { "predicate": { "custom_model_data": 6380006}, "model": "custom/soulcleaver"},
+  { "predicate": { "custom_model_data": 6380007}, "model": "custom/vileblade"},
+  { "predicate": { "custom_model_data": 6380008}, "model": "custom/adukatana"},
+  { "predicate": { "custom_model_data": 6380009}, "model": "custom/valleyblade"},
+  { "predicate": { "custom_model_data": 6380010}, "model": "custom/beatricesword"},
+  { "predicate": { "custom_model_data": 6380011}, "model": "custom/hero"},
+  { "predicate": { "custom_model_data": 6380012}, "model": "custom/egg"}	
+]
+
+}

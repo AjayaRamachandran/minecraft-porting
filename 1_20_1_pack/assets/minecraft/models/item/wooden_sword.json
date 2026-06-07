@@ -1,0 +1,19 @@
+{
+  "parent": "minecraft:item/handheld",
+  "textures": {
+    "layer0": "minecraft:item/wooden_sword"
+  },
+"overrides": 
+[
+  { "predicate": { "custom_model_data": 1}, "model": "custom/brokesword"},
+  { "predicate": { "custom_model_data": 2}, "model": "custom/brokencop"},
+  {"predicate": {"custom_model_data": 3},"model": "custom/darkenigma"},
+
+  { "predicate": { "custom_model_data": 17010}, "model": "custom/brokenherosword"},	
+  { "predicate": { "custom_model_data": 7080001}, "model": "custom/stripped"},
+  { "predicate": { "custom_model_data": 7080002}, "model": "custom/bane"},
+  { "predicate": { "custom_model_data": 7080003}, "model": "custom/hard"},
+  { "predicate": { "custom_model_data": 7080004}, "model": "custom/handle"}
+]
+
+}

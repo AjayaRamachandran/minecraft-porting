@@ -1,0 +1,41 @@
+{
+  "parent": "minecraft:item/handheld",
+  "textures": {
+    "layer0": "minecraft:item/netherite_axe"
+  },
+"overrides": 
+[
+  { "predicate": { "custom_model_data": 1}, "model": "custom/darkthrow"},
+  { "predicate": { "custom_model_data": 2}, "model": "custom/leviathanaxe"},
+  { "predicate": { "custom_model_data": 3}, "model": "custom/curveaxe"},
+  { "predicate": { "custom_model_data": 4}, "model": "custom/arcaxe"},
+
+    {"predicate": {"custom_model_data": 5},"model": "custom/bloodaxe"},
+    {"predicate": {"custom_model_data": 6},"model": "custom/glaciumaxe"},
+    {"predicate": {"custom_model_data": 7},"model": "custom/guildaxe"},
+    {"predicate": {"custom_model_data": 8},"model": "custom/magmaaxe"},
+    {"predicate": {"custom_model_data": 9},"model": "custom/nightaxe"},
+    {"predicate": {"custom_model_data": 10},"model": "custom/bsaxe"},
+    {"predicate": {"custom_model_data": 11},"model": "custom/mercanem_battleaxe"},
+
+  { "predicate": { "custom_model_data": 404}, "model": "custom/demonaxe"},
+  { "predicate": { "custom_model_data": 405}, "model": "custom/infernoaxe"},
+  { "predicate": { "custom_model_data": 406}, "model": "custom/sciaxe"},
+
+  { "predicate": { "custom_model_data": 2028}, "model": "custom/stormhammer"},
+  { "predicate": { "custom_model_data": 3006}, "model": "custom/onyxaxe"},
+
+  { "predicate": { "custom_model_data": 4011}, "model": "custom/abaxe"},
+  { "predicate": { "custom_model_data": 4012}, "model": "custom/staraxe"},
+
+  { "predicate": { "custom_model_data": 7033}, "model": "custom/duraaxe"},
+  { "predicate": { "custom_model_data": 7034}, "model": "custom/ultragoldaxe"},
+
+  { "predicate": { "custom_model_data": 17090}, "model": "custom/ashaxe"},	
+
+  { "predicate": { "custom_model_data": 5480001}, "model": "custom/blackhole"},
+  { "predicate": { "custom_model_data": 5480002}, "model": "custom/voidhammer"},
+  { "predicate": { "custom_model_data": 5480003}, "model": "custom/richie"}
+]
+
+}

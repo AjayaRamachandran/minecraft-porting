@@ -1,0 +1,23 @@
+{
+  "parent": "minecraft:item/handheld",
+  "textures": {
+    "layer0": "minecraft:item/netherite_shovel"
+  },
+    "overrides":
+	[
+  { "predicate": { "custom_model_data": 1}, "model": "custom/bsshov"},
+  { "predicate": { "custom_model_data": 2}, "model": "custom/fshov"},
+
+    {"predicate": {"custom_model_data": 410},"model": "custom/demonshovel"},
+    {"predicate": {"custom_model_data": 411},"model": "custom/infernoshovel"},
+
+  { "predicate": { "custom_model_data": 4008}, "model": "custom/abshovel"},
+  { "predicate": { "custom_model_data": 4009}, "model": "custom/cshovel"},
+
+  { "predicate": { "custom_model_data": 7037}, "model": "custom/supergoldshovel"},
+  { "predicate": { "custom_model_data": 7038}, "model": "custom/ultragoldshovel"},
+  { "predicate": { "custom_model_data": 7039}, "model": "custom/myretiteshovel"},
+  { "predicate": { "custom_model_data": 7040}, "model": "custom/durashovel"}
+
+    ]
+}

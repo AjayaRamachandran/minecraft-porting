@@ -1,0 +1,25 @@
+{
+  "parent": "minecraft:item/handheld",
+  "textures": {
+    "layer0": "minecraft:item/diamond_pickaxe"
+  },
+"overrides": 
+[
+    {"predicate": {"custom_model_data": 1},"model": "custom/leadpick"},
+    {"predicate": {"custom_model_data": 2},"model": "custom/platinumpick"},
+    {"predicate": {"custom_model_data": 3},"model": "custom/silverpick"},
+    {"predicate": {"custom_model_data": 4},"model": "custom/tinpick"},
+    {"predicate": {"custom_model_data": 5},"model": "custom/tungstenpick"},
+    {"predicate": {"custom_model_data": 6},"model": "custom/zincpick"},
+    {"predicate": {"custom_model_data": 7},"model": "custom/pripick"},
+	
+  { "predicate": { "custom_model_data": 244}, "model": "custom/redpickaxe"},
+  { "predicate": { "custom_model_data": 245}, "model": "custom/orangepickaxe"},
+
+  { "predicate": { "custom_model_data": 2031}, "model": "custom/pickevo"},
+
+  { "predicate": { "custom_model_data": 3017}, "model": "custom/unpick"}	
+
+]
+
+}

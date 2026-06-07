@@ -1,0 +1,15 @@
+{
+  "parent": "minecraft:item/generated",
+  "textures": {
+    "layer0": "minecraft:item/gold_ingot"
+  },
+"overrides": 
+[
+  { "predicate": { "custom_model_data": 127}, "model": "custom/vingot"},
+  { "predicate": { "custom_model_data": 7015}, "model": "custom/ultragold"},
+
+  { "predicate": { "custom_model_data": 17053}, "model": "custom/desertgold"},	
+  { "predicate": { "custom_model_data": 99993}, "model": "custom/valiant_steel_ingot"}
+]
+
+}

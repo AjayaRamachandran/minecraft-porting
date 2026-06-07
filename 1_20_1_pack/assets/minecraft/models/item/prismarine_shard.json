@@ -1,0 +1,14 @@
+{
+  "parent": "minecraft:item/generated",
+  "textures": {
+    "layer0": "minecraft:item/prismarine_shard"
+  },
+  "overrides":
+  [
+    { "predicate": { "custom_model_data": 230}, "model": "custom/demonsoul"},
+    { "predicate": { "custom_model_data": 3007}, "model": "custom/ambergem"},
+    { "predicate": { "custom_model_data": 3008}, "model": "custom/greenflame"},
+    { "predicate": { "custom_model_data": 99998}, "model": "custom/reinforced_arxite"},
+    { "predicate": { "custom_model_data": 99999}, "model": "custom/arxite_crystal"}
+  ]
+}

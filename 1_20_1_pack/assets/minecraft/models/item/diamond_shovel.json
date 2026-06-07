@@ -1,0 +1,15 @@
+{
+  "parent": "minecraft:item/handheld",
+  "textures": {
+    "layer0": "minecraft:item/diamond_shovel"
+  },
+    "overrides":
+	[
+  { "predicate": { "custom_model_data": 1}, "model": "custom/prishov"},
+
+    {"predicate": {"custom_model_data": 241},"model": "custom/redshovel"},
+    {"predicate": {"custom_model_data": 242},"model": "custom/orangeshovel"},
+    {"predicate": {"custom_model_data": 3000},"model": "custom/unshovel"}
+
+    ]
+}

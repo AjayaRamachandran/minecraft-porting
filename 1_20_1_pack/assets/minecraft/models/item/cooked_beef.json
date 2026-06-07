@@ -1,0 +1,15 @@
+{
+  "parent": "minecraft:item/generated",
+  "textures": {
+    "layer0": "minecraft:item/cooked_beef"
+  },
+  "overrides":
+  [
+    { "predicate": { "custom_model_data": 1}, "model": "custom/dmeat"},
+  { "predicate": { "custom_model_data": 2}, "model": "custom/spcap"},
+    { "predicate": { "custom_model_data": 7002}, "model": "custom/cookedmeat"},
+    { "predicate": { "custom_model_data": 7003}, "model": "custom/goldmeat"},
+    { "predicate": { "custom_model_data": 17057}, "model": "custom/leg"},
+    { "predicate": { "custom_model_data": 17058}, "model": "custom/bonea"}
+  ]
+}

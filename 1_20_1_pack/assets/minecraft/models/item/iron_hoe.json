@@ -1,0 +1,14 @@
+{
+  "parent": "minecraft:item/handheld",
+  "textures": {
+    "layer0": "minecraft:item/iron_hoe"
+  },
+"overrides": 
+[
+  { "predicate": { "custom_model_data": 6480031}, "model": "custom/nsickle"},
+  { "predicate": { "custom_model_data": 6480034}, "model": "custom/bsickle"},
+  { "predicate": { "custom_model_data": 6980035}, "model": "custom/tsscythe"},
+  { "predicate": { "custom_model_data": 6980036}, "model": "custom/scary"}
+]
+
+}

@@ -1,0 +1,11 @@
+{
+  "parent": "minecraft:item/generated",
+  "textures": {
+    "layer0": "minecraft:item/leather"
+  },
+  "overrides":
+  [
+    { "predicate": { "custom_model_data": 99998}, "model": "custom/vag1"},
+    { "predicate": { "custom_model_data": 99999}, "model": "custom/vag2"}
+  ]
+}

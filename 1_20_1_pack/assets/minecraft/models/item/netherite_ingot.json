@@ -1,0 +1,31 @@
+{
+  "parent": "minecraft:item/generated",
+  "textures": {
+    "layer0": "minecraft:item/netherite_ingot"
+  },
+"overrides": 
+[
+    {"predicate": {"custom_model_data": 1},"model": "custom/bloodbar"},
+    {"predicate": {"custom_model_data": 2},"model": "custom/crimsonbar"},
+    {"predicate": {"custom_model_data": 3},"model": "custom/magmabar"},
+    {"predicate": {"custom_model_data": 4},"model": "custom/nightbar"},
+    {"predicate": {"custom_model_data": 5},"model": "custom/oceanbar"},
+    {"predicate": {"custom_model_data": 6},"model": "custom/black_charon_ingot"},
+    {"predicate": {"custom_model_data": 7},"model": "custom/tagg_bar"},
+    {"predicate": {"custom_model_data": 8},"model": "custom/castlightbar"},
+    {"predicate": {"custom_model_data": 9},"model": "custom/terkk"},
+
+
+  { "predicate": { "custom_model_data": 126}, "model": "custom/titanium"},
+  { "predicate": { "custom_model_data": 129}, "model": "custom/terraingot"},
+  { "predicate": { "custom_model_data": 222}, "model": "custom/demonbar"},
+  { "predicate": { "custom_model_data": 223}, "model": "custom/sciingot"},
+  { "predicate": { "custom_model_data": 2000}, "model": "custom/jbar"},
+  { "predicate": { "custom_model_data": 2001}, "model": "custom/stormbar"},
+  { "predicate": { "custom_model_data": 7015}, "model": "custom/durasteelbar"},
+  { "predicate": { "custom_model_data": 7016}, "model": "custom/fiery_ingot"},
+
+  { "predicate": { "custom_model_data": 12342}, "model": "custom/tyrant_steel_ingot"}
+]
+
+}

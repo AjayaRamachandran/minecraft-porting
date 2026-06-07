@@ -1,0 +1,12 @@
+{
+  "parent": "minecraft:item/generated",
+  "textures": {
+    "layer0": "minecraft:item/tropical_fish"
+  },
+  "overrides":
+  [
+    { "predicate": { "custom_model_data": 7000}, "model": "custom/whiteshroom"},
+    { "predicate": { "custom_model_data": 7001}, "model": "custom/meat"},
+    { "predicate": { "custom_model_data": 7005}, "model": "custom/cult"}
+  ]
+}

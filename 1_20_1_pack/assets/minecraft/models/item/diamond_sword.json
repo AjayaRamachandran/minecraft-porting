@@ -1,0 +1,73 @@
+{
+  "parent": "minecraft:item/handheld",
+  "textures": {
+    "layer0": "minecraft:item/diamond_sword"
+  },
+"overrides": 
+[
+  { "predicate": { "custom_model_data": 1}, "model": "custom/leadbig"},
+  { "predicate": { "custom_model_data": 2}, "model": "custom/leadsh"},
+  { "predicate": { "custom_model_data": 3}, "model": "custom/prisword"},
+  { "predicate": { "custom_model_data": 4}, "model": "custom/silverbig"},
+  { "predicate": { "custom_model_data": 5}, "model": "custom/silversh"},
+
+  { "predicate": { "custom_model_data": 6}, "model": "custom/knife"},
+  { "predicate": { "custom_model_data": 7}, "model": "custom/sharpened_knife"},
+  { "predicate": { "custom_model_data": 8}, "model": "custom/charmed_knife"},
+  { "predicate": { "custom_model_data": 9}, "model": "custom/abandoned_knife"},
+  { "predicate": { "custom_model_data": 10}, "model": "custom/imbued_knife"},
+  { "predicate": { "custom_model_data": 11}, "model": "custom/enhanced_knife"},
+  { "predicate": { "custom_model_data": 12}, "model": "custom/filigreed_knife"},
+  { "predicate": { "custom_model_data": 13}, "model": "custom/runic_knife"},
+  { "predicate": { "custom_model_data": 14}, "model": "custom/wrought_knife"},
+  { "predicate": { "custom_model_data": 15}, "model": "custom/scarab_shell_flakespear"},
+
+  { "predicate": { "custom_model_data": 200}, "model": "custom/arma"},
+  { "predicate": { "custom_model_data": 233}, "model": "custom/orangesword"},
+  { "predicate": { "custom_model_data": 234}, "model": "custom/redsword"},
+  { "predicate": { "custom_model_data": 634}, "model": "custom/armageddon"},
+
+  { "predicate": { "custom_model_data": 2029}, "model": "custom/makoevo"},
+  { "predicate": { "custom_model_data": 2030}, "model": "custom/snowevo"},
+
+  { "predicate": { "custom_model_data": 3036}, "model": "custom/terraknife"},
+  { "predicate": { "custom_model_data": 3037}, "model": "custom/tidebreaker"},
+  { "predicate": { "custom_model_data": 3038}, "model": "custom/titansword"},
+  { "predicate": { "custom_model_data": 3039}, "model": "custom/ziriumclaymore"},	
+  { "predicate": { "custom_model_data": 3040}, "model": "custom/dungeonrunner"},
+  { "predicate": { "custom_model_data": 3041}, "model": "custom/chromatic"},
+  { "predicate": { "custom_model_data": 3042}, "model": "custom/ziriumdagger"},
+  { "predicate": { "custom_model_data": 3043}, "model": "custom/ziriumblade"},
+  { "predicate": { "custom_model_data": 3044}, "model": "custom/ziriumsword"},
+  { "predicate": { "custom_model_data": 3045}, "model": "custom/ziriumgreatsword"},
+
+  { "predicate": { "custom_model_data": 4100}, "model": "custom/tidesword"},
+
+  { "predicate": { "custom_model_data": 17070}, "model": "custom/diamondblade"},	
+  { "predicate": { "custom_model_data": 17071}, "model": "custom/diamondmace"},	
+  { "predicate": { "custom_model_data": 17072}, "model": "custom/diamondflamberge"},	
+  { "predicate": { "custom_model_data": 17073}, "model": "custom/diamondkhopesh"},	
+
+  { "predicate": { "custom_model_data": 99983}, "model": "custom/oacutlass"},
+  { "predicate": { "custom_model_data": 99984}, "model": "custom/oadagger"},
+  { "predicate": { "custom_model_data": 99989}, "model": "custom/jaded_amber_cutlass"},
+  { "predicate": { "custom_model_data": 99990}, "model": "custom/scarab"},
+
+  { "predicate": { "custom_model_data": 6280001}, "model": "custom/big"},
+  { "predicate": { "custom_model_data": 6280002}, "model": "custom/apexblade"},
+  { "predicate": { "custom_model_data": 6280003}, "model": "custom/arcanesword"},
+  { "predicate": { "custom_model_data": 6280004}, "model": "custom/makocutlass"},	
+  { "predicate": { "custom_model_data": 6280005}, "model": "custom/greatsword"},
+  { "predicate": { "custom_model_data": 6280006}, "model": "custom/malasword"},
+  { "predicate": { "custom_model_data": 6280007}, "model": "custom/mythrilsword"},
+  { "predicate": { "custom_model_data": 6280008}, "model": "custom/mythrilmace"},
+  { "predicate": { "custom_model_data": 6280009}, "model": "custom/koathiankatana"},
+  { "predicate": { "custom_model_data": 6280010}, "model": "custom/koathianclaymore"},
+
+  { "predicate": { "custom_model_data": 6280011}, "model": "custom/malaflam"},
+  { "predicate": { "custom_model_data": 6280012}, "model": "custom/malaclaymore"},
+  { "predicate": { "custom_model_data": 6280013}, "model": "custom/malacleaver"},
+  { "predicate": { "custom_model_data": 6280014}, "model": "custom/malacrusher"}
+]
+
+}

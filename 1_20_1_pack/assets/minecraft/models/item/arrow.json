@@ -1,0 +1,13 @@
+{
+  "parent": "minecraft:item/generated",
+  "textures": {
+    "layer0": "minecraft:item/arrow"
+  },
+  "overrides":
+  [
+    { "predicate": { "custom_model_data": 17059}, "model": "custom/firearrow"},
+    { "predicate": { "custom_model_data": 17060}, "model": "custom/poisonarrow"},
+    { "predicate": { "custom_model_data": 17061}, "model": "custom/sharparrow"},	
+    { "predicate": { "custom_model_data": 17062}, "model": "custom/freezearrow"}	
+  ]
+}

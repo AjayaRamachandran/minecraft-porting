@@ -1,0 +1,12 @@
+{
+  "parent": "minecraft:item/generated",
+  "textures": {
+    "layer0": "minecraft:item/bread"
+  },
+  "overrides":
+  [
+    { "predicate": { "custom_model_data": 17054}, "model": "custom/kiwi"},
+    { "predicate": { "custom_model_data": 17055}, "model": "custom/cursedapple"},
+    { "predicate": { "custom_model_data": 17056}, "model": "custom/sweetpotato"}
+  ]
+}

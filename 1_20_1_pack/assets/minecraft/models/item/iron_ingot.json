@@ -1,0 +1,49 @@
+{
+  "parent": "minecraft:item/generated",
+  "textures": {
+    "layer0": "minecraft:item/iron_ingot"
+  },
+"overrides": 
+[
+      {"predicate": {"custom_model_data": 1},"model": "custom/angelbar"},
+    {"predicate": {"custom_model_data": 2},"model": "custom/glaciumbar"},
+    {"predicate": {"custom_model_data": 3},"model": "custom/leadbar"},
+    {"predicate": {"custom_model_data": 4},"model": "custom/platinumbar"},
+    {"predicate": {"custom_model_data": 5},"model": "custom/silverbar"},
+    {"predicate": {"custom_model_data": 6},"model": "custom/tinbar"},
+    {"predicate": {"custom_model_data": 7},"model": "custom/tungstenbar"},
+    {"predicate": {"custom_model_data": 8},"model": "custom/zincbar"},
+    {"predicate": {"custom_model_data": 9},"model": "custom/raw_charon"},
+    {"predicate": {"custom_model_data": 10},"model": "custom/mercanem_bar"},
+    {"predicate": {"custom_model_data": 11},"model": "custom/charon_ingot"},
+
+{ "predicate": { "custom_model_data": 120}, "model": "custom/lead"},
+  { "predicate": { "custom_model_data": 121}, "model": "custom/steel"},
+  { "predicate": { "custom_model_data": 122}, "model": "custom/truesteel"},
+  { "predicate": { "custom_model_data": 123}, "model": "custom/nsteel"},
+  { "predicate": { "custom_model_data": 124}, "model": "custom/ksteel"},
+  { "predicate": { "custom_model_data": 125}, "model": "custom/kalloy"},
+
+  { "predicate": { "custom_model_data": 3013}, "model": "custom/redingot"},
+  { "predicate": { "custom_model_data": 3014}, "model": "custom/banebar"},
+
+  { "predicate": { "custom_model_data": 4000}, "model": "custom/mgingot"},
+  { "predicate": { "custom_model_data": 4001}, "model": "custom/nebulaingot"},
+  { "predicate": { "custom_model_data": 4002}, "model": "custom/abingot"},
+  { "predicate": { "custom_model_data": 4003}, "model": "custom/celestium_ingot"},
+
+  { "predicate": { "custom_model_data": 7017}, "model": "custom/carmot"},
+  { "predicate": { "custom_model_data": 7018}, "model": "custom/molteningot"},
+  { "predicate": { "custom_model_data": 7019}, "model": "custom/myretite"},
+  { "predicate": { "custom_model_data": 7020}, "model": "custom/ironwood"},
+  { "predicate": { "custom_model_data": 7021}, "model": "custom/knightmetal"},
+  { "predicate": { "custom_model_data": 7022}, "model": "custom/platinum"},
+  { "predicate": { "custom_model_data": 7023}, "model": "custom/runite"},
+
+
+  { "predicate": { "custom_model_data": 99994}, "model": "custom/wicked_steel_ingot"},
+  { "predicate": { "custom_model_data": 99995}, "model": "custom/vernium_ingot"}
+
+]
+
+}

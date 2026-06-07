@@ -1,0 +1,32 @@
+{
+  "parent": "minecraft:item/handheld",
+  "textures": {
+    "layer0": "minecraft:item/netherite_pickaxe"
+  },
+"overrides": 
+[
+    { "predicate": { "custom_model_data": 1}, "model": "custom/legendpick"},	
+
+    {"predicate": {"custom_model_data": 2},"model": "custom/bloodpick"},
+    {"predicate": {"custom_model_data": 3},"model": "custom/glaciumpick"},
+    {"predicate": {"custom_model_data": 4},"model": "custom/guildpick"},
+    {"predicate": {"custom_model_data": 5},"model": "custom/magmapick"},
+    {"predicate": {"custom_model_data": 6},"model": "custom/nightpick"},
+    {"predicate": {"custom_model_data": 7},"model": "custom/bspick"},
+    {"predicate": {"custom_model_data": 8},"model": "custom/fpick"},
+
+  { "predicate": { "custom_model_data": 401}, "model": "custom/demonpickaxe"},
+  { "predicate": { "custom_model_data": 402}, "model": "custom/scipick"},
+  { "predicate": { "custom_model_data": 403}, "model": "custom/infernopick"},
+  { "predicate": { "custom_model_data": 3015}, "model": "custom/onyxpick"},
+  { "predicate": { "custom_model_data": 3016}, "model": "custom/darkpick"},
+
+  { "predicate": { "custom_model_data": 4005}, "model": "custom/abpick"},
+  { "predicate": { "custom_model_data": 4006}, "model": "custom/cpick"},
+  { "predicate": { "custom_model_data": 4007}, "model": "custom/starpick"},
+
+  { "predicate": { "custom_model_data": 7034}, "model": "custom/ultragoldpick"}	
+
+]
+
+}

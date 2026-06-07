@@ -1,0 +1,14 @@
+{
+  "parent": "item/generated",
+  "textures": {
+      "layer0": "item/totem_of_undying"
+  },
+"overrides": 
+[	
+  { "predicate": { "custom_model_data": 3005}, "model": "custom/axolotoltotem"},
+  { "predicate": { "custom_model_data": 17008}, "model": "custom/invistotem"},	
+  { "predicate": { "custom_model_data": 17009}, "model": "custom/bloodthirsty"}		
+
+]
+
+}

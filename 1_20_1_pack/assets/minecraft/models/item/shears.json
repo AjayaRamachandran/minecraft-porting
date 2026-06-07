@@ -1,0 +1,12 @@
+{
+  "parent": "minecraft:item/handheld",
+  "textures": {
+    "layer0": "minecraft:item/shears"
+  },
+"overrides": 
+[
+  { "predicate": { "custom_model_data": 5311}, "model": "custom/hedge"},
+  { "predicate": { "custom_model_data": 7041}, "model": "custom/amshears"}	
+]
+
+}
