@@ -5,6 +5,12 @@ pre-1.20.5 ``tag`` field to the modern ``components`` structure, and handles
 other legacy patterns that appear in the run-clause of execute commands.
 
 Patterns handled:
+- ``nbt={Inventory:[{Slot:Xb,tag:{FLAG:1b}},…]}``
+                                 → chained ``if items entity @s SLOT *[minecraft:custom_data~{FLAG:1b}]``
+  Armor slots (100-103) and all hotbar/inventory/offhand slots are mapped to
+  their named equivalents (armor.head, hotbar.N, inventory.N, weapon.offhand).
+  This replaces the nbt= inventory approach which stopped working for armor
+  slots in 1.21.5+ when equipment was moved out of the Inventory list.
 - ``tag:{SIMPLE_FLAG:1b}``       → ``components:{"minecraft:custom_data":{SIMPLE_FLAG:1b}}``
 - ``tag:{CustomModelData:N}``    → ``components:{"minecraft:item_model":"minecraft:custom/STEM"}``
   (model name resolved from old pack, same as item_converter — CMD is never preserved)
@@ -62,6 +68,68 @@ LEGACY_EFFECT_IDS: dict[int, str] = {
 }
 
 
+# Inventory slot number → execute-if-items slot name (1.20.5+)
+_SLOT_NAMES: dict[int, str] = {
+    103: "armor.head",
+    102: "armor.chest",
+    101: "armor.legs",
+    100: "armor.feet",
+    40: "weapon.offhand",
+    -106: "weapon.offhand",
+}
+for _i in range(9):
+    _SLOT_NAMES[_i] = f"hotbar.{_i}"
+for _i in range(9, 36):
+    _SLOT_NAMES[_i] = f"inventory.{_i - 9}"
+
+# One {Slot:Nb,tag:{FLAG:1b}} entry inside an Inventory list
+_INV_SLOT_ENTRY_RE = re.compile(r'\{Slot:(-?\d+)b,tag:\{([a-zA-Z0-9_]+):1b\}\}')
+
+# The entire ,?nbt={Inventory:[single-flag-entries]} block in a selector
+_INV_NBT_BLOCK_RE = re.compile(
+    r',?nbt=\{Inventory:\[((?:\{Slot:-?\d+b,tag:\{[a-zA-Z0-9_]+:1b\}\},?)+)\]\}'
+)
+
+# Leading "/?execute as @X[optional-selector]" at start of command
+_EXECUTE_AS_HEAD_RE = re.compile(
+    r'(^/?execute\s+as\s+@\w(?:\[[^\]]*\])?)',
+    re.IGNORECASE,
+)
+
+
+def _convert_inventory_slots_to_items(cmd: str) -> str:
+    """Replace nbt={Inventory:[{Slot:Xb,tag:{FLAG:1b}},...]} with chained if items."""
+    m = _INV_NBT_BLOCK_RE.search(cmd)
+    if not m:
+        return cmd
+
+    slot_entries = _INV_SLOT_ENTRY_RE.findall(m.group(1))
+    if not slot_entries:
+        return cmd
+
+    items_parts: list[str] = []
+    for slot_str, flag in slot_entries:
+        slot_name = _SLOT_NAMES.get(int(slot_str))
+        if slot_name is None:
+            return cmd
+        items_parts.append(
+            f'if items entity @s {slot_name} *[minecraft:custom_data~{{{flag}:1b}}]'
+        )
+
+    # Strip the nbt= block and tidy the selector brackets
+    cmd = _INV_NBT_BLOCK_RE.sub('', cmd)
+    cmd = re.sub(r'\[,\s*', '[', cmd)
+    cmd = re.sub(r',\s*\]', ']', cmd)
+    cmd = re.sub(r'\[\]', '', cmd)
+
+    # Splice the if items subcommands in after "execute as @X[...]"
+    hm = _EXECUTE_AS_HEAD_RE.match(cmd)
+    if not hm:
+        return cmd
+
+    return hm.group(1) + ' ' + ' '.join(items_parts) + cmd[hm.end():]
+
+
 def _json_to_snbt(json_str: str) -> str:
     """Convert a JSON text-component string to its SNBT compound form."""
     converted = convert_text_component(Str(json_str, "'"))
@@ -76,6 +144,12 @@ _COUNT_RE = re.compile(r"Count:1b,\s*|,\s*Count:1b\b")
 
 _ACTIVE_EFFECTS_RE = re.compile(
     r'ActiveEffects:\[\s*\{\s*Id\s*:\s*(\d+)\s*,\s*Amplifier\s*:\s*(\d+b)\s*\}\s*\]'
+)
+
+# Matches "run tellraw <target> <json-payload>" in an execute command
+_TELLRAW_RE = re.compile(
+    r'(\brun\s+/?tellraw\s+\S+\s+)(\{.+|\[.+)',
+    re.IGNORECASE,
 )
 
 # clear <target> <item>{CustomModelData:N}  (optionally prefixed by "run ")
@@ -146,6 +220,9 @@ def _replace_cmd_in_clear(cmd_str: str, pipeline) -> str:
 def _transform_nbt_selector(cmd: str, pipeline) -> str:
     """Apply all legacy transforms to a command string."""
 
+    # 0. nbt={Inventory:[{Slot:Xb,tag:{FLAG:1b}},...]} → if items entity @s <slot> *[...]
+    cmd = _convert_inventory_slots_to_items(cmd)
+
     # 1. tag:{display:{Name:'JSON'}} → custom_name component (most specific first)
     def _replace_display(m: re.Match) -> str:
         snbt = _json_to_snbt(m.group(1))
@@ -182,6 +259,14 @@ def _transform_nbt_selector(cmd: str, pipeline) -> str:
         r'\1[minecraft:custom_data={\2:1b}]',
         cmd,
     )
+
+    # 8. Convert JSON text component in run tellraw to 1.21.5+ SNBT
+    #    (clickEvent→click_event, hoverEvent→hover_event, value→command/url)
+    m = _TELLRAW_RE.search(cmd)
+    if m:
+        converted = convert_text_component(Str(m.group(2), "'"))
+        if not isinstance(converted, Str):
+            cmd = cmd[:m.start(2)] + snbt_dump(converted)
 
     return cmd
 
