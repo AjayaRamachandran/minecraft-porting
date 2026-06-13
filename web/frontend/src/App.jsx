@@ -1,14 +1,16 @@
 import { useState, useEffect } from 'react'
-import { RefreshCw, Bot } from 'lucide-react'
+import { RefreshCw, Bot, Package } from 'lucide-react'
 import { SunIcon, MoonIcon } from './icons'
 import ConverterView from './ConverterView'
 import NpcMaker from './NpcMaker'
+import ItemLibrary from './ItemLibrary'
 
 // Left-rail tools. This is the top hierarchical level — one above the
 // page-level horizontal tabs inside the converter (Command vs Schematic).
 const TOOLS = [
   { key: 'converter', label: 'Converter', icon: RefreshCw, Component: ConverterView },
   { key: 'npc', label: 'NPC Maker', icon: Bot, Component: NpcMaker },
+  { key: 'items', label: 'Item Library', icon: Package, Component: ItemLibrary },
 ]
 
 export default function App() {

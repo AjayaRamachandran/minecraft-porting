@@ -47,21 +47,91 @@ def _esc_snbt_single(s: str) -> str:
     return s.replace("\\", "\\\\").replace("'", "\\'")
 
 
+def _converter_imports():
+    """Lazily import the converter's SNBT renderer (shared with the converter).
+
+    builder.py also runs standalone via ``main.py`` and through the web backend,
+    so the import path to ``convert_villager/`` is set up on demand rather than
+    at module load. Reuses :meth:`ItemConverter.render_components_bracket` and
+    the ``Num``/``Str`` SNBT node types so give-command components render
+    exactly like the converter's ``/give`` output.
+    """
+    import sys
+    from pathlib import Path
+
+    cv = Path(__file__).resolve().parent.parent / "convert_villager"
+    if str(cv) not in sys.path:
+        sys.path.insert(0, str(cv))
+    from converter.item_converter import ItemConverter  # noqa: PLC0415
+    from converter.snbt import Num, Str  # noqa: PLC0415
+    return ItemConverter, Num, Str
+
+
+def _json_to_snbt(value, Num, Str):
+    """Convert plain JSON component values into SNBT nodes for rendering.
+
+    Booleans become byte ``1b``/``0b`` (checked before int — ``bool`` is a
+    subclass of ``int``), ints stay untyped, floats get the ``d`` suffix, and
+    strings are double-quoted. Compounds/lists recurse.
+    """
+    if isinstance(value, bool):
+        return Num(1 if value else 0, "b")
+    if isinstance(value, int):
+        return Num(value, "")
+    if isinstance(value, float):
+        return Num(value, "d")
+    if isinstance(value, str):
+        return Str(value, '"')
+    if isinstance(value, dict):
+        return {k: _json_to_snbt(v, Num, Str) for k, v in value.items()}
+    if isinstance(value, list):
+        return [_json_to_snbt(v, Num, Str) for v in value]
+    if value is None:
+        return Str("", '"')
+    raise TypeError(f"cannot convert to SNBT: {type(value).__name__}")
+
+
+def _norm_item(it: dict) -> dict:
+    """Normalize one give-item: ``{base_item, count, components}`` (raw JSON)."""
+    base = str(it.get("base_item") or "paper")
+    if base.startswith("minecraft:"):
+        base = base.split(":", 1)[1]
+    return {
+        "base_item": base,
+        "count": int(it.get("count", 1) or 1),
+        "components": it.get("components") or {},
+    }
+
+
+def _give_command(item: dict) -> str:
+    """Render a single ``give @s minecraft:<base>[<components>] <count>`` command.
+
+    No leading slash — this is the body after ``... run`` in an /execute. The
+    component bracket is produced by the converter's renderer.
+    """
+    ItemConverter, Num, Str = _converter_imports()
+    comps = {k: _json_to_snbt(v, Num, Str) for k, v in (item["components"] or {}).items()}
+    bracket = ItemConverter.render_components_bracket(comps)
+    return f"give @s minecraft:{item['base_item']}{bracket} {item['count']}"
+
+
 def normalize(data: dict) -> dict:
-    """Return a 1.1-format copy of ``data``, migrating 1.0 inputs forward.
+    """Return a current-format copy of ``data``, migrating older inputs forward.
 
     Version is taken from ``builder_version`` (string). A missing version is
-    treated as 1.0 — that's what the original hand-written JSONs are.
+    treated as 1.0 — that's what the original hand-written JSONs are. 1.0/1.1
+    inputs simply carry no per-choice ``items`` and produce byte-identical
+    output to before. 1.2 adds optional ``items`` on choices (drag-to-give).
     """
     version = str(data.get("builder_version", "1.0"))
     conversations = data.get("conversations", []) or []
 
-    if version == "1.1":
+    if version in ("1.1", "1.2"):
         npc_name = data.get("npc_name", "")
         name_color = data.get("name_color") or DEFAULT_NAME_COLOR
     else:
-        # 1.0 → 1.1: lift the per-node name (they were all identical) up to the
-        # NPC level, default the colour, and drop per-node names.
+        # 1.0 → current: lift the per-node name (they were all identical) up to
+        # the NPC level, default the colour, and drop per-node names.
         npc_name = ""
         for conv in conversations:
             if conv.get("npc_name"):
@@ -75,13 +145,17 @@ def normalize(data: dict) -> dict:
             "scoreboard_tag": str(conv.get("scoreboard_tag", "")),
             "message": conv.get("message", ""),
             "choices": [
-                {"text": c.get("text", ""), "direct": str(c.get("direct", ""))}
+                {
+                    "text": c.get("text", ""),
+                    "direct": str(c.get("direct", "")),
+                    "items": [_norm_item(it) for it in (c.get("items") or [])],
+                }
                 for c in (conv.get("choices") or [])
             ],
         })
 
     return {
-        "builder_version": "1.1",
+        "builder_version": "1.2",
         "npc_variable_initial": data.get("npc_variable_initial", "npc"),
         "npc_name": npc_name,
         "name_color": name_color,
@@ -99,12 +173,17 @@ def _dialogue_command(prefix: str, tag: str, npc_name: str, name_color: str, mes
     return f"/execute as @a[scores={{{prefix}{tag}=1}}] run tellraw @s {body}"
 
 
-def _choice_command(prefix: str, tag: str, text: str, direct: str) -> str:
-    """A clickable choice line. Uses 1.21.5+ click_event/command keys."""
+def _choice_command(prefix: str, tag: str, text: str, trigger_obj: str) -> str:
+    """A clickable choice line. Uses 1.21.5+ click_event/command keys.
+
+    ``trigger_obj`` is the full objective the click ``/trigger``s — the target
+    node's objective for a normal choice, or a per-choice staging objective for
+    a give-choice.
+    """
     payload = {
         "text": f"> [{text}]",
         "color": "light_purple",
-        "click_event": {"action": "run_command", "command": f"/trigger {prefix}{direct}"},
+        "click_event": {"action": "run_command", "command": f"/trigger {trigger_obj}"},
     }
     body = json.dumps(payload, ensure_ascii=False, separators=(",", ":"))
     return f"/execute as @a[scores={{{prefix}{tag}=1}}] run tellraw @s {body}"
@@ -143,6 +222,8 @@ def build(data: dict):
     x = 0
     links: list[list] = []     # [scoreboard_tag, [target_tags...]]
     height_map: list[list] = []  # [x, scoreboard_tag, next_free_y]
+    give_stages: list[dict] = []  # [{"stage": int, "head": tag}] for give-choices
+    stage = 1000               # global staging-objective counter (no node-tag clash)
 
     # --- per-conversation columns ------------------------------------------
     for conv in conversations:
@@ -156,19 +237,56 @@ def build(data: dict):
         out.append(dialogue)
         schem.setBlock((x, y, z), _cmd_block("repeating_command_block", dialogue))
 
-        links.append([tag, [c["direct"] for c in conv["choices"]]])
+        # Only normal (non-give) choices route via player /trigger and need
+        # break-safe enable wiring. Give-choices route through their staging
+        # objective and command-block `set`, wired in the give-stage section.
+        links.append([tag, [c["direct"] for c in conv["choices"] if not c["items"]]])
 
         for choice in conv["choices"]:
+            is_give = bool(choice["items"])
+            trigger_obj = f"{prefix}g{stage}" if is_give else f"{prefix}{choice['direct']}"
             y += 1
-            choice_cmd = _choice_command(prefix, tag, choice["text"], choice["direct"])
+            choice_cmd = _choice_command(prefix, tag, choice["text"], trigger_obj)
             out.append(choice_cmd)
             schem.setBlock((x, y, z), _cmd_block("chain_command_block", choice_cmd))
             # Mark the player's current node so the link section knows which
-            # branches they're allowed to enable.
+            # branches (and staging objectives) they're allowed to enable.
             y += 1
             mark = (f"/execute as @a[scores={{{prefix}{tag}=1}}] run "
                     f"scoreboard players set @s {prefix} {tag}")
             schem.setBlock((x, y, z), _cmd_block("chain_command_block", mark))
+
+            if is_give:
+                # Give group, gated on the per-choice staging objective so it
+                # fires exactly once for players who clicked THIS choice (not
+                # the target node). The click set it via /trigger; we give the
+                # item(s), advance/route, then clear the staging score last.
+                gate = f"/execute as @a[scores={{{prefix}g{stage}=1..}}] run "
+                for it in choice["items"]:
+                    y += 1
+                    give = gate + _give_command(it)
+                    out.append(give)
+                    schem.setBlock((x, y, z), _cmd_block("chain_command_block", give))
+                y += 1
+                if choice["direct"]:
+                    # Reproduce a normal `/trigger <prefix><direct>` from a
+                    # command-block (op-level) so the target column fires.
+                    adv = gate + f"scoreboard players set @s {prefix}{choice['direct']} 1"
+                else:
+                    # Give-only choice: end the conversation (park at node 0).
+                    adv = gate + f"scoreboard players set @s {prefix} 0"
+                out.append(adv)
+                schem.setBlock((x, y, z), _cmd_block("chain_command_block", adv))
+                # Clear the staging score (must be the last gated block) + reset.
+                y += 1
+                clr = gate + f"scoreboard players set @s {prefix}g{stage} 0"
+                out.append(clr)
+                schem.setBlock((x, y, z), _cmd_block("chain_command_block", clr))
+                y += 1
+                rst = f"/scoreboard players reset @a {prefix}g{stage}"
+                schem.setBlock((x, y, z), _cmd_block("chain_command_block", rst))
+                give_stages.append({"stage": stage, "head": tag})
+                stage += 1
 
         if not conv["choices"]:
             y += 1
@@ -210,6 +328,18 @@ def build(data: dict):
         schem.setBlock((x, y, z + 2), _cmd_block("command_block", destroy, auto=False))
         schem.setBlock((x, y + 1, z), "redstone_wire")
         schem.setBlock((x, y + 1, z + 2), "redstone_wire")
+    # One trigger objective per give-choice, continuing the same powered row.
+    for gs in give_stages:
+        z = 1
+        x += 1
+        obj = f"{prefix}g{gs['stage']}"
+        initialize = f"/scoreboard objectives add {obj} trigger"
+        destroy = f"/scoreboard objectives remove {obj}"
+        out.append(initialize)
+        schem.setBlock((x, y, z), _cmd_block("command_block", initialize, auto=False))
+        schem.setBlock((x, y, z + 2), _cmd_block("command_block", destroy, auto=False))
+        schem.setBlock((x, y + 1, z), "redstone_wire")
+        schem.setBlock((x, y + 1, z + 2), "redstone_wire")
 
     # --- entry point + break-safe link wiring ------------------------------
     x = 0
@@ -234,5 +364,21 @@ def build(data: dict):
             link_cmd = (f"/execute as @a[scores={{{prefix}={head}}}] run "
                         f"scoreboard players enable @s {prefix}{branch}")
             schem.setBlock((x, y, z), _cmd_block("chain_command_block", link_cmd))
+
+    # Break-safe enable for each give-choice's staging objective: only players
+    # sitting on the head node (their `<prefix>` dummy == head, set by the mark
+    # block) may /trigger it. Placed in the head node's own column.
+    for gs in give_stages:
+        head = gs["head"]
+        target = next((hm for hm in height_map if hm[1] == head), None)
+        if target is None:
+            continue
+        x = target[0]
+        y = target[2]
+        target[2] += 1
+        y += 1
+        link_cmd = (f"/execute as @a[scores={{{prefix}={head}}}] run "
+                    f"scoreboard players enable @s {prefix}g{gs['stage']}")
+        schem.setBlock((x, y, z), _cmd_block("chain_command_block", link_cmd))
 
     return schem, "\n".join(out) + "\n"

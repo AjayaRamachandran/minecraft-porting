@@ -1,1 +1,8 @@
 node_modules
+dist/
+
+# Secrets — never commit real credentials (keep .env.example tracked)
+.env
+*.env
+!.env.example
+__pycache__/

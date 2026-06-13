@@ -1,148 +1,40 @@
 import { useState, useMemo, useRef, useEffect } from 'react'
 import {
-  Plus, Trash2, Crosshair, Download, Copy, Upload, X, MessageSquare, ChevronRight,
-  ChevronDown, Check, Hash,
+  Plus, Trash2, Crosshair, Download, Copy, Upload, X, MessageSquare, ChevronRight, Package,
 } from 'lucide-react'
-
-const API_BASE = ''
-
-// Standard Minecraft named text colors → hex. Order matches the in-game list.
-const MC_COLOR_LIST = [
-  ['black', '#000000'], ['dark_blue', '#0000AA'], ['dark_green', '#00AA00'],
-  ['dark_aqua', '#00AAAA'], ['dark_red', '#AA0000'], ['dark_purple', '#AA00AA'],
-  ['gold', '#FFAA00'], ['gray', '#AAAAAA'], ['dark_gray', '#555555'],
-  ['blue', '#5555FF'], ['green', '#55FF55'], ['aqua', '#55FFFF'],
-  ['red', '#FF5555'], ['light_purple', '#FF55FF'], ['yellow', '#FFFF55'],
-  ['white', '#FFFFFF'],
-]
-const MC_COLORS = Object.fromEntries(MC_COLOR_LIST)
-
-// Resolve a color string to a hex for preview. Returns null if invalid.
-function resolveColor(c) {
-  if (!c) return null
-  if (/^#([0-9a-fA-F]{6}|[0-9a-fA-F]{3})$/.test(c)) return c
-  return MC_COLORS[c] || null
-}
-
-// Name-color dropdown: lists the 16 Minecraft colors (each name shown in its
-// own color, on a dark tooltip-like panel) plus a "Hex code" option that opens
-// an MCStacker-style popover for a custom hex.
-function ColorPicker({ value, onChange }) {
-  const [open, setOpen] = useState(false)
-  const [hexMode, setHexMode] = useState(false)
-  const [hexDraft, setHexDraft] = useState(value.startsWith('#') ? value : '#FFAA00')
-  const ref = useRef(null)
-
-  useEffect(() => {
-    if (!open) return
-    const onDown = (e) => {
-      if (ref.current && !ref.current.contains(e.target)) {
-        setOpen(false)
-        setHexMode(false)
-      }
-    }
-    document.addEventListener('mousedown', onDown)
-    return () => document.removeEventListener('mousedown', onDown)
-  }, [open])
-
-  const isHex = value.startsWith('#')
-  const swatch = resolveColor(value)
-  const applyHex = () => {
-    if (/^#([0-9a-fA-F]{6}|[0-9a-fA-F]{3})$/.test(hexDraft)) {
-      onChange(hexDraft)
-      setOpen(false)
-      setHexMode(false)
-    }
-  }
-
-  return (
-    <div className="relative" ref={ref}>
-      <button
-        type="button"
-        onClick={() => setOpen((o) => !o)}
-        className={`w-full flex items-center gap-2 px-3 py-1.5 text-sm border bg-zinc-50 dark:bg-zinc-900 rounded-lg transition-colors ${
-          swatch ? 'border-zinc-200 dark:border-zinc-700' : 'border-red-400 dark:border-red-700'
-        }`}
-      >
-        <span
-          className="w-4 h-4 border border-black/20 shrink-0"
-          style={{ backgroundColor: swatch || 'transparent' }}
-        />
-        <span className="truncate" style={swatch && isHex ? { color: swatch } : undefined}>
-          {value || 'pick a color'}
-        </span>
-        <ChevronDown size={14} className="ml-auto text-zinc-400 shrink-0" />
-      </button>
-
-      {open && (
-        <div className="absolute z-40 mt-1 w-full max-h-72 overflow-auto bg-zinc-900 border border-zinc-700 rounded-lg shadow-2xl p-1">
-          {MC_COLOR_LIST.map(([name, hex]) => (
-            <button
-              key={name}
-              type="button"
-              onClick={() => { onChange(name); setOpen(false); setHexMode(false) }}
-              className="w-full flex items-center gap-2 px-2 py-1 text-sm rounded-md hover:bg-zinc-800 transition-colors"
-            >
-              <span className="w-4 h-4 border border-white/20 shrink-0" style={{ backgroundColor: hex }} />
-              <span style={{ color: hex }}>{name}</span>
-              {value === name && <Check size={13} className="ml-auto text-zinc-400" />}
-            </button>
-          ))}
-
-          <div className="my-1 border-t border-zinc-700" />
-          <button
-            type="button"
-            onClick={() => setHexMode((h) => !h)}
-            className="w-full flex items-center gap-2 px-2 py-1 text-sm rounded-md text-zinc-200 hover:bg-zinc-800 transition-colors"
-          >
-            <Hash size={14} className="text-zinc-400" />
-            Hex code…
-            {isHex && <Check size={13} className="ml-auto text-zinc-400" />}
-          </button>
-
-          {hexMode && (
-            <div className="mt-1 p-2 bg-zinc-800 rounded-md space-y-2">
-              <div className="flex items-center gap-2">
-                <input
-                  type="color"
-                  value={/^#[0-9a-fA-F]{6}$/.test(hexDraft) ? hexDraft : '#FFAA00'}
-                  onChange={(e) => setHexDraft(e.target.value.toUpperCase())}
-                  className="w-8 h-8 bg-transparent cursor-pointer shrink-0"
-                />
-                <input
-                  value={hexDraft}
-                  onChange={(e) => setHexDraft(e.target.value)}
-                  onKeyDown={(e) => e.key === 'Enter' && applyHex()}
-                  placeholder="#FFAA00"
-                  className="flex-1 min-w-0 px-2 py-1 text-sm font-mono bg-zinc-900 border border-zinc-700 rounded-md text-zinc-100 focus:outline-none focus:ring-2 focus:ring-zinc-600"
-                />
-              </div>
-              <button
-                type="button"
-                onClick={applyHex}
-                className="w-full px-3 py-1 text-sm bg-zinc-100 text-zinc-900 rounded-md hover:bg-white transition-colors"
-              >
-                Apply
-              </button>
-            </div>
-          )}
-        </div>
-      )}
-    </div>
-  )
-}
+import {
+  API_BASE, ColorPicker, resolveColor, ItemSlot, textureUrl, buildGivePayload, fetchItems,
+} from './mc'
 
 let _uid = 0
 const uid = () => `n${++_uid}`
 
-// Migrate any builder JSON (1.0 legacy or 1.1) to the editor's in-memory model.
+// A give-item attached to a choice carries the builder give-payload
+// (base_item, count, components) plus display-only fields (_stem for the
+// texture thumbnail, _label for the chip/tooltip). The underscore fields are
+// stripped on export.
+function choiceItemFromManifest(item) {
+  const payload = buildGivePayload(item)
+  return { ...payload, _stem: item.model_stem, _label: item.custom_name?.text || item.name || item.model_stem }
+}
+
+function choiceItemFromJson(it) {
+  const comps = it.components || {}
+  const stem = String(comps['minecraft:item_model'] || '').replace(/^minecraft:custom\//, '')
+  const label = comps['minecraft:custom_name']?.text || stem || it.base_item || 'item'
+  return { base_item: it.base_item, count: it.count || 1, components: comps, _stem: stem, _label: label }
+}
+
+const choiceItemToJson = ({ _stem, _label, ...payload }) => payload // drop display fields
+
+// Migrate any builder JSON (1.0 / 1.1 / 1.2) to the editor's in-memory model.
 // Mirrors npc-maker/builder.py: normalize().
 function migrate(data) {
   const version = String(data.builder_version ?? '1.0')
   const convs = Array.isArray(data.conversations) ? data.conversations : []
   let npcName = ''
   let nameColor = 'gold'
-  if (version === '1.1') {
+  if (version === '1.1' || version === '1.2') {
     npcName = data.npc_name || ''
     nameColor = data.name_color || 'gold'
   } else {
@@ -160,22 +52,27 @@ function migrate(data) {
         id: uid(),
         text: ch.text || '',
         direct: String(ch.direct ?? ''),
+        items: (ch.items || []).map(choiceItemFromJson),
       })),
     })),
   }
 }
 
-// Editor model → exportable 1.1 JSON (drops internal ids).
+// Editor model → exportable 1.2 JSON (drops internal ids and display fields).
 function toJson(state) {
   return {
-    builder_version: '1.1',
+    builder_version: '1.2',
     npc_variable_initial: state.npc_variable_initial,
     npc_name: state.npc_name,
     name_color: state.name_color,
     conversations: state.conversations.map((c) => ({
       scoreboard_tag: c.scoreboard_tag,
       message: c.message,
-      choices: c.choices.map((ch) => ({ text: ch.text, direct: ch.direct })),
+      choices: c.choices.map((ch) => {
+        const out = { text: ch.text, direct: ch.direct }
+        if (ch.items?.length) out.items = ch.items.map(choiceItemToJson)
+        return out
+      }),
     })),
   }
 }
@@ -200,6 +97,23 @@ export default function NpcMaker() {
   const [error, setError] = useState('')
   const [copied, setCopied] = useState(false)
   const fileRef = useRef(null)
+  // Saved custom items shown in the inventory strip, draggable onto choices.
+  const [library, setLibrary] = useState([])
+  const [dragOverChoice, setDragOverChoice] = useState(null)
+
+  useEffect(() => {
+    fetchItems().then(setLibrary).catch(() => setLibrary([]))
+  }, [])
+
+  const onDropOnChoice = (e, messageId, choiceId) => {
+    e.preventDefault()
+    setDragOverChoice(null)
+    const raw = e.dataTransfer.getData('application/x-mc-item')
+    if (!raw) return
+    try {
+      dropItemOnChoice(messageId, choiceId, JSON.parse(raw))
+    } catch { /* ignore malformed drops */ }
+  }
 
   const tagSet = useMemo(
     () => new Set(state.conversations.map((c) => c.scoreboard_tag).filter(Boolean)),
@@ -237,7 +151,17 @@ export default function NpcMaker() {
     }))
 
   const addChoice = (messageId) =>
-    updateMessageChoices(messageId, (choices) => [...choices, { id: uid(), text: '', direct: '' }])
+    updateMessageChoices(messageId, (choices) => [...choices, { id: uid(), text: '', direct: '', items: [] }])
+
+  const dropItemOnChoice = (messageId, choiceId, manifest) =>
+    updateMessageChoices(messageId, (choices) =>
+      choices.map((ch) =>
+        ch.id === choiceId ? { ...ch, items: [...(ch.items || []), choiceItemFromManifest(manifest)] } : ch))
+
+  const removeChoiceItem = (messageId, choiceId, idx) =>
+    updateMessageChoices(messageId, (choices) =>
+      choices.map((ch) =>
+        ch.id === choiceId ? { ...ch, items: ch.items.filter((_, i) => i !== idx) } : ch))
 
   const deleteChoice = (messageId, choiceId) =>
     updateMessageChoices(messageId, (choices) => choices.filter((ch) => ch.id !== choiceId))
@@ -349,7 +273,8 @@ export default function NpcMaker() {
 
   // ----------------------------------------------------------------------
   return (
-    <div className="max-w-3xl mx-auto px-6 py-8 space-y-5">
+    <>
+    <div className="max-w-3xl mx-auto px-6 py-8 pb-28 space-y-5">
       <div className="flex items-start justify-between gap-4">
         <div>
           <h2 className="text-5xl leading-none">NPC Maker</h2>
@@ -520,51 +445,90 @@ export default function NpcMaker() {
                   const invalid = ch.direct && !tagSet.has(ch.direct)
                   const isThisLinking =
                     linking && linking.messageId === message.id && linking.choiceId === ch.id
+                  const dragOver = dragOverChoice === ch.id
                   return (
-                    <div key={ch.id} className="flex items-center gap-2">
-                      <ChevronRight size={14} className="text-zinc-400 shrink-0" />
-                      <input
-                        value={ch.text}
-                        onClick={(e) => e.stopPropagation()}
-                        onChange={(e) => updateChoice(message.id, ch.id, { text: e.target.value })}
-                        placeholder="Choice the player can click…"
-                        className="flex-1 px-3 py-1.5 text-sm rounded-lg border border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-900 focus:outline-none focus:ring-2 focus:ring-zinc-300 dark:focus:ring-zinc-600"
-                      />
-                      <div className="flex items-center gap-1 shrink-0">
-                        <span className="text-xs text-zinc-400">→</span>
+                    <div
+                      key={ch.id}
+                      onDragOver={(e) => { e.preventDefault(); e.dataTransfer.dropEffect = 'copy'; setDragOverChoice(ch.id) }}
+                      onDragLeave={(e) => { if (!e.currentTarget.contains(e.relatedTarget)) setDragOverChoice((c) => (c === ch.id ? null : c)) }}
+                      onDrop={(e) => onDropOnChoice(e, message.id, ch.id)}
+                      className={`rounded-lg transition-all ${
+                        dragOver ? 'ring-2 ring-amber-400 dark:ring-amber-500 bg-amber-50/60 dark:bg-amber-950/30 p-1.5 -m-1.5' : ''
+                      }`}
+                    >
+                      <div className="flex items-center gap-2">
+                        <ChevronRight size={14} className="text-zinc-400 shrink-0" />
                         <input
-                          value={ch.direct}
+                          value={ch.text}
                           onClick={(e) => e.stopPropagation()}
-                          onChange={(e) => updateChoice(message.id, ch.id, { direct: e.target.value.replace(/\s+/g, '') })}
-                          placeholder="message"
-                          title={invalid ? 'No message has this number (will be wired in-game)' : 'Target message'}
-                          className={`w-16 px-2 py-1.5 text-sm rounded-lg border bg-zinc-50 dark:bg-zinc-900 focus:outline-none focus:ring-2 ${
-                            invalid
-                              ? 'border-red-400 dark:border-red-600 text-red-600 dark:text-red-400 focus:ring-red-300'
-                              : linked
-                              ? 'border-emerald-400 dark:border-emerald-700 focus:ring-emerald-300'
-                              : 'border-zinc-200 dark:border-zinc-700 focus:ring-zinc-300 dark:focus:ring-zinc-600'
-                          }`}
+                          onChange={(e) => updateChoice(message.id, ch.id, { text: e.target.value })}
+                          placeholder="Choice the player can click…"
+                          className="flex-1 px-3 py-1.5 text-sm rounded-lg border border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-900 focus:outline-none focus:ring-2 focus:ring-zinc-300 dark:focus:ring-zinc-600"
                         />
-                        <button
-                          onClick={(e) => { e.stopPropagation(); startLinking(message.id, ch.id) }}
-                          className={`p-1.5 rounded-md transition-colors ${
-                            isThisLinking
-                              ? 'bg-indigo-100 dark:bg-indigo-900 text-indigo-600 dark:text-indigo-300'
-                              : 'text-zinc-400 hover:text-indigo-600 hover:bg-indigo-50 dark:hover:bg-indigo-950'
-                          }`}
-                          title="Pick response message"
-                        >
-                          <Crosshair size={15} />
-                        </button>
-                        <button
-                          onClick={(e) => { e.stopPropagation(); deleteChoice(message.id, ch.id) }}
-                          className="p-1.5 rounded-md text-zinc-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-950 transition-colors"
-                          title="Remove choice"
-                        >
-                          <Trash2 size={14} />
-                        </button>
+                        <div className="flex items-center gap-1 shrink-0">
+                          <span className="text-xs text-zinc-400">→</span>
+                          <input
+                            value={ch.direct}
+                            onClick={(e) => e.stopPropagation()}
+                            onChange={(e) => updateChoice(message.id, ch.id, { direct: e.target.value.replace(/\s+/g, '') })}
+                            placeholder={ch.items?.length ? 'none' : 'message'}
+                            title={invalid ? 'No message has this number (will be wired in-game)' : 'Target message (optional when the choice gives an item)'}
+                            className={`w-16 px-2 py-1.5 text-sm rounded-lg border bg-zinc-50 dark:bg-zinc-900 focus:outline-none focus:ring-2 ${
+                              invalid
+                                ? 'border-red-400 dark:border-red-600 text-red-600 dark:text-red-400 focus:ring-red-300'
+                                : linked
+                                ? 'border-emerald-400 dark:border-emerald-700 focus:ring-emerald-300'
+                                : 'border-zinc-200 dark:border-zinc-700 focus:ring-zinc-300 dark:focus:ring-zinc-600'
+                            }`}
+                          />
+                          <button
+                            onClick={(e) => { e.stopPropagation(); startLinking(message.id, ch.id) }}
+                            className={`p-1.5 rounded-md transition-colors ${
+                              isThisLinking
+                                ? 'bg-indigo-100 dark:bg-indigo-900 text-indigo-600 dark:text-indigo-300'
+                                : 'text-zinc-400 hover:text-indigo-600 hover:bg-indigo-50 dark:hover:bg-indigo-950'
+                            }`}
+                            title="Pick response message"
+                          >
+                            <Crosshair size={15} />
+                          </button>
+                          <button
+                            onClick={(e) => { e.stopPropagation(); deleteChoice(message.id, ch.id) }}
+                            className="p-1.5 rounded-md text-zinc-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-950 transition-colors"
+                            title="Remove choice"
+                          >
+                            <Trash2 size={14} />
+                          </button>
+                        </div>
                       </div>
+
+                      {/* Items this choice gives (dragged from the library strip) */}
+                      {ch.items?.length > 0 && (
+                        <div className="flex flex-wrap items-center gap-1.5 mt-1.5 pl-5">
+                          <span className="text-[10px] uppercase tracking-wide text-zinc-400">gives</span>
+                          {ch.items.map((it, i) => (
+                            <div key={i} className="relative">
+                              <ItemSlot
+                                texture={it._stem ? textureUrl(it._stem) : null}
+                                name={it.components['minecraft:custom_name'] || { text: it._label }}
+                                lore={it.components['minecraft:lore'] || []}
+                                size={32}
+                                title={it._label}
+                              />
+                              {it.count > 1 && (
+                                <span className="absolute bottom-0 right-0 text-[10px] font-bold px-0.5 bg-black/70 text-white leading-none">{it.count}</span>
+                              )}
+                              <button
+                                onClick={(e) => { e.stopPropagation(); removeChoiceItem(message.id, ch.id, i) }}
+                                className="absolute -top-1 -right-1 p-0.5 rounded bg-red-600 text-white hover:bg-red-500"
+                                title="Remove item"
+                              >
+                                <X size={9} />
+                              </button>
+                            </div>
+                          ))}
+                        </div>
+                      )}
                     </div>
                   )
                 })}
@@ -629,5 +593,36 @@ export default function NpcMaker() {
         </p>
       )}
     </div>
+
+    {/* Item Library inventory strip — drag an item onto any choice to give it. */}
+    <div className="fixed bottom-0 left-52 right-0 z-30 border-t border-zinc-200 dark:border-zinc-800 bg-white/95 dark:bg-zinc-950/95 backdrop-blur px-4 py-2">
+      <div className="flex items-center gap-3">
+        <span className="flex items-center gap-1.5 text-xs font-medium text-zinc-500 dark:text-zinc-400 shrink-0">
+          <Package size={14} /> Item Library
+        </span>
+        <div className="flex items-center gap-1.5 overflow-x-auto py-1">
+          {library.length === 0 ? (
+            <span className="text-xs text-zinc-400">No saved items — create some in the Item Library tab.</span>
+          ) : (
+            library.map((item) => (
+              <ItemSlot
+                key={item.id}
+                texture={textureUrl(item.model_stem)}
+                name={item.custom_name}
+                lore={item.lore}
+                size={40}
+                draggable
+                title={`Drag “${item.name}” onto a choice`}
+                onDragStart={(e) => {
+                  e.dataTransfer.setData('application/x-mc-item', JSON.stringify(item))
+                  e.dataTransfer.effectAllowed = 'copy'
+                }}
+              />
+            ))
+          )}
+        </div>
+      </div>
+    </div>
+    </>
   )
 }

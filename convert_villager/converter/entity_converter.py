@@ -344,9 +344,11 @@ class EntityConverter:
         new_effects.append({
             "id":             Str("minecraft:resistance", '"'),
             "amplifier":      Num(amplifier, "b"),
-            "duration":       Num(-1, ""),   # -1 == infinite
+            # max signed int ticks (~3.4 years) — effectively permanent without
+            # relying on the -1 "infinite" sentinel.
+            "duration":       Num(2147483647, ""),
             "ambient":        Num(0, "b"),
-            "show_particles": Num(0, "b"),
+            "show_particles": Num(0, "b"),   # noParticles
             "show_icon":      Num(0, "b"),
         })
         out["active_effects"] = new_effects
