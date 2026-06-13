@@ -37,6 +37,33 @@ _SINGLE_ITEM_FIELDS = ("Item", "SaddleItem", "ArmorItem", "Body", "Trident")
 _ARMOR_DROP_SLOTS = ("feet", "legs", "chest", "head")
 _HAND_DROP_SLOTS = ("mainhand", "offhand")
 
+# ---------------------------------------------------------------------------
+# EHP / absorption / resistance rebalancing
+# ---------------------------------------------------------------------------
+# Minecraft 1.21+ caps the attributes that build effective HP:
+#   * minecraft:max_health     -> 1024  (real HP)
+#   * minecraft:max_absorption -> 2048  (absorption HP)
+# and, crucially, absorption hearts set via ``AbsorptionAmount`` are clamped on
+# spawn to the entity's ``max_absorption`` attribute. Legacy mobs that carry e.g.
+# ``AbsorptionAmount:700f`` with no ``max_absorption`` attribute therefore lose
+# all their absorption (it defaults to ~0), gutting their effective HP.
+_EHP_HP_CAP = 1024.0           # max real HP
+_EHP_ABSORB_CAP = 2048.0       # max absorption HP
+_EHP_BASE_CAP = _EHP_HP_CAP + _EHP_ABSORB_CAP   # 3072 — most EHP without resistance
+_EHP_HARD_CAP = 15000.0        # new in-game effective-HP ceiling
+
+# Resistance tiers, lowest → highest. Each is (EHP multiplier, effect amplifier).
+# multiplier = 1 / (1 - damage_reduction); amplifier is the NBT level (Res I == 0b).
+#   Res I  (0): 20% DR -> 1.25x     Res III (2): 60% DR -> 2.5x
+#   Res II (1): 40% DR -> 1.667x    Res IV  (3): 80% DR -> 5x
+_RESISTANCE_TIERS = (
+    (1.0,        None),  # no resistance — base EHP only
+    (1.25,       0),     # Resistance I
+    (5.0 / 3.0,  1),     # Resistance II  (1/0.6)
+    (2.5,        2),     # Resistance III
+    (5.0,        3),     # Resistance IV
+)
+
 
 def _looks_like_item(node) -> bool:
     return isinstance(node, dict) and isinstance(node.get("id"), Str)
@@ -127,6 +154,11 @@ class EntityConverter:
             if equip:
                 out["equipment"] = equip
 
+        # Re-fit effective HP into 1.21+ caps: back absorption with a
+        # max_absorption attribute, spill over-cap health into absorption, and
+        # use Resistance to recover EHP that no longer fits in raw hearts.
+        self._apply_ehp_caps(out, ctx)
+
         return out
 
     def convert_spawner_be(self, be_tag: dict, ctx: str) -> dict:
@@ -191,6 +223,133 @@ class EntityConverter:
                 new_entry["modifiers"] = a["Modifiers"]
             out.append(new_entry)
         return out
+
+    # ----- EHP / absorption / resistance --------------------------------
+
+    def _apply_ehp_caps(self, out: dict, ctx: str) -> None:
+        """Make a mob's effective HP survive the 1.21+ attribute caps.
+
+        Three cases, decided by the entity's max_health attribute (``H``) and
+        ``AbsorptionAmount`` (``A``):
+
+        1. *Nothing to do* — no absorption and health within cap. Left untouched
+           (this also skips non-living entities, which have neither field).
+        2. *Within caps* (``H<=1024`` and ``A<=2048``) — structure is preserved
+           verbatim; we only add a ``max_absorption`` attribute equal to ``A`` so
+           the absorption hearts aren't clamped away on spawn.
+        3. *Over a cap* (``H>1024`` or ``A>2048``) — the mob's canonical EHP
+           (``H+A``, clamped to 15000) is re-fit into ``1024`` real HP + absorption,
+           applying the lowest Resistance tier whose multiplier keeps the 3072
+           base EHP at or above the target. Health/AbsorptionAmount/max_health/
+           max_absorption are all rewritten and a Resistance effect is added.
+        """
+        attrs = out.get("attributes")
+        attrs = attrs if isinstance(attrs, list) else None
+        H = self._attr_base(attrs, "max_health")
+        a_node = out.get("AbsorptionAmount")
+        A = float(a_node.value) if isinstance(a_node, Num) else 0.0
+
+        has_absorption = A > 0.0
+        over_hp = H is not None and H > _EHP_HP_CAP
+        over_absorb = A > _EHP_ABSORB_CAP
+
+        # Case 1 — ordinary mob, nothing to fix (also covers non-living NBT).
+        if not has_absorption and not over_hp:
+            return
+
+        # Case 2 — within caps: keep everything, just back the absorption.
+        if not over_hp and not over_absorb:
+            self._set_attr_base(out, "minecraft:max_absorption", A)
+            return
+
+        # Case 3 — over a cap: redistribute + Resistance to preserve EHP.
+        target = (H if H is not None else 0.0) + A
+        capped = min(target, _EHP_HARD_CAP)
+        if target > _EHP_HARD_CAP:
+            self.warnings.append(
+                f"[{ctx}] EHP {target:.0f} exceeds cap; clamped to {_EHP_HARD_CAP:.0f}"
+            )
+
+        mult, amplifier = self._pick_resistance(capped)
+        base_ehp = capped / mult
+        real_hp = round(min(base_ehp, _EHP_HP_CAP), 2)
+        absorption = round(base_ehp - real_hp, 2)   # <= 2048 by construction
+
+        self._set_attr_base(out, "minecraft:max_health", real_hp)
+        out["Health"] = Num(real_hp, "f")
+        out["AbsorptionAmount"] = Num(absorption, "f")
+        self._set_attr_base(out, "minecraft:max_absorption", absorption)
+        if amplifier is not None:
+            self._add_resistance(out, amplifier)
+
+    @staticmethod
+    def _pick_resistance(target: float):
+        """Lowest ``(multiplier, amplifier)`` tier whose base EHP reaches ``target``."""
+        for mult, amplifier in _RESISTANCE_TIERS:
+            if target <= _EHP_BASE_CAP * mult + 1e-6:
+                return mult, amplifier
+        return _RESISTANCE_TIERS[-1]  # Res IV — only reachable above the hard cap
+
+    @staticmethod
+    def _attr_base(attrs, suffix: str):
+        """Return the ``base`` (as float) of the attribute whose id ends in
+        ``suffix`` (e.g. ``"max_health"``), or ``None`` if absent."""
+        if not attrs:
+            return None
+        for a in attrs:
+            if not isinstance(a, dict):
+                continue
+            idn = a.get("id")
+            name = idn.value if isinstance(idn, Str) else None
+            if name and name.rsplit(":", 1)[-1] == suffix:
+                base = a.get("base")
+                if isinstance(base, Num):
+                    return float(base.value)
+        return None
+
+    def _set_attr_base(self, out: dict, attr_id: str, value: float) -> None:
+        """Set (or create) the attribute ``attr_id``'s ``base`` to ``value`` (double)."""
+        attrs = out.get("attributes")
+        if not isinstance(attrs, list):
+            attrs = []
+            out["attributes"] = attrs
+        suffix = attr_id.rsplit(":", 1)[-1]
+        new_base = Num(float(value), "d")
+        for a in attrs:
+            if not isinstance(a, dict):
+                continue
+            idn = a.get("id")
+            name = idn.value if isinstance(idn, Str) else None
+            if name and name.rsplit(":", 1)[-1] == suffix:
+                a["base"] = new_base
+                return
+        attrs.append({"id": Str(attr_id, '"'), "base": new_base})
+
+    def _add_resistance(self, out: dict, amplifier: int) -> None:
+        """Add an infinite, hidden Resistance effect at ``amplifier`` (Res I == 0).
+
+        Any pre-existing Resistance in ``active_effects`` is replaced; other
+        effects are preserved.
+        """
+        effects = out.get("active_effects")
+        new_effects: list = []
+        if isinstance(effects, list):
+            for e in effects:
+                if isinstance(e, dict):
+                    idn = e.get("id")
+                    name = idn.value if isinstance(idn, Str) else ""
+                    if name.rsplit(":", 1)[-1] == "resistance":
+                        continue
+                new_effects.append(e)
+        new_effects.append({
+            "id":             Str("minecraft:resistance", '"'),
+            "amplifier":      Num(amplifier, "b"),
+            "duration":       Num(-1, ""),   # -1 == infinite
+            "ambient":        Num(0, "b"),
+            "show_particles": Num(0, "b"),
+            "show_icon":      Num(0, "b"),
+        })
+        out["active_effects"] = new_effects
 
     @staticmethod
     def _merge_drop_chances(out: dict, slots: tuple, values: list) -> None:

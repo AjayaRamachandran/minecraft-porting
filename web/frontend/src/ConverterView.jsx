@@ -106,7 +106,7 @@ export default function ConverterView() {
             onClick={() => switchMode(key)}
             className={`px-4 py-1.5 text-sm rounded-md border border-transparent transition-all ${
               mode === key
-                ? 'bg-white dark:bg-zinc-700 text-zinc-900 dark:text-zinc-100 font-medium shadow-sm border-zinc-200 dark:border-zinc-600'
+                ? 'bg-white dark:bg-zinc-700 text-zinc-900 dark:text-zinc-100 font-medium border-zinc-200 dark:border-zinc-600'
                 : 'text-zinc-500 dark:text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200'
             }`}
           >

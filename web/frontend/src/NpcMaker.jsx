@@ -191,7 +191,7 @@ const blankState = () => ({
 
 export default function NpcMaker() {
   const [state, setState] = useState(blankState)
-  // linking = { nodeId, choiceId } when the user is picking a link target.
+  // linking = { messageId, choiceId } when the user is picking a link target.
   const [linking, setLinking] = useState(null)
   const [showImport, setShowImport] = useState(false)
   const [importText, setImportText] = useState('')
@@ -210,15 +210,15 @@ export default function NpcMaker() {
   // --- state mutation helpers -------------------------------------------
   const setField = (k, v) => setState((s) => ({ ...s, [k]: v }))
 
-  const updateNode = (nodeId, patch) =>
+  const updateMessage = (messageId, patch) =>
     setState((s) => ({
       ...s,
-      conversations: s.conversations.map((c) => (c.id === nodeId ? { ...c, ...patch } : c)),
+      conversations: s.conversations.map((c) => (c.id === messageId ? { ...c, ...patch } : c)),
     }))
 
-  const addNode = () =>
+  const addMessage = () =>
     setState((s) => {
-      // Default the new node's number to the next free integer.
+      // Default the new message's number to the next free integer.
       const nums = s.conversations.map((c) => parseInt(c.scoreboard_tag, 10)).filter((n) => !isNaN(n))
       const next = (nums.length ? Math.max(...nums) : 0) + 1
       return {
@@ -230,39 +230,39 @@ export default function NpcMaker() {
       }
     })
 
-  const deleteNode = (nodeId) =>
+  const deleteMessage = (messageId) =>
     setState((s) => ({
       ...s,
-      conversations: s.conversations.filter((c) => c.id !== nodeId),
+      conversations: s.conversations.filter((c) => c.id !== messageId),
     }))
 
-  const addChoice = (nodeId) =>
-    updateNodeChoices(nodeId, (choices) => [...choices, { id: uid(), text: '', direct: '' }])
+  const addChoice = (messageId) =>
+    updateMessageChoices(messageId, (choices) => [...choices, { id: uid(), text: '', direct: '' }])
 
-  const deleteChoice = (nodeId, choiceId) =>
-    updateNodeChoices(nodeId, (choices) => choices.filter((ch) => ch.id !== choiceId))
+  const deleteChoice = (messageId, choiceId) =>
+    updateMessageChoices(messageId, (choices) => choices.filter((ch) => ch.id !== choiceId))
 
-  const updateChoice = (nodeId, choiceId, patch) =>
-    updateNodeChoices(nodeId, (choices) =>
+  const updateChoice = (messageId, choiceId, patch) =>
+    updateMessageChoices(messageId, (choices) =>
       choices.map((ch) => (ch.id === choiceId ? { ...ch, ...patch } : ch)))
 
-  function updateNodeChoices(nodeId, fn) {
+  function updateMessageChoices(messageId, fn) {
     setState((s) => ({
       ...s,
       conversations: s.conversations.map((c) =>
-        c.id === nodeId ? { ...c, choices: fn(c.choices) } : c),
+        c.id === messageId ? { ...c, choices: fn(c.choices) } : c),
     }))
   }
 
   // --- link picker -------------------------------------------------------
-  const startLinking = (nodeId, choiceId) => {
+  const startLinking = (messageId, choiceId) => {
     setLinking((cur) =>
-      cur && cur.nodeId === nodeId && cur.choiceId === choiceId ? null : { nodeId, choiceId })
+      cur && cur.messageId === messageId && cur.choiceId === choiceId ? null : { messageId, choiceId })
   }
 
-  const onNodeClick = (targetNode) => {
+  const onMessageClick = (targetMessage) => {
     if (!linking) return
-    updateChoice(linking.nodeId, linking.choiceId, { direct: targetNode.scoreboard_tag })
+    updateChoice(linking.messageId, linking.choiceId, { direct: targetMessage.scoreboard_tag })
     setLinking(null)
   }
 
@@ -454,34 +454,34 @@ export default function NpcMaker() {
       {linking && (
         <div className="flex items-center gap-2 text-sm text-indigo-700 dark:text-indigo-300 bg-indigo-50 dark:bg-indigo-950 border border-indigo-200 dark:border-indigo-900 rounded-lg px-3 py-2">
           <Crosshair size={15} />
-          Click a node below to link this choice to it.
+          Click a message below to link this choice to it.
           <button onClick={() => setLinking(null)} className="ml-auto hover:opacity-70">
             <X size={15} />
           </button>
         </div>
       )}
 
-      {/* Node list */}
+      {/* Message list */}
       <div className="space-y-4">
-        {state.conversations.map((node) => {
+        {state.conversations.map((message) => {
           const isLinkTarget = !!linking
           return (
             <div
-              key={node.id}
-              onClick={isLinkTarget ? () => onNodeClick(node) : undefined}
+              key={message.id}
+              onClick={isLinkTarget ? () => onMessageClick(message) : undefined}
               className={`bg-white dark:bg-zinc-800 border rounded-xl p-4 space-y-3 transition-all ${
                 isLinkTarget
                   ? 'cursor-pointer border-indigo-400 dark:border-indigo-600 ring-2 ring-indigo-300/50 dark:ring-indigo-700/40 hover:bg-indigo-50/50 dark:hover:bg-indigo-950/30'
                   : 'border-zinc-200 dark:border-zinc-700'
               }`}
             >
-              {/* Node header */}
+              {/* Message header */}
               <div className="flex items-center gap-2">
                 <span className="text-xs font-medium text-zinc-400 dark:text-zinc-500">Chat Message</span>
                 <input
-                  value={node.scoreboard_tag}
+                  value={message.scoreboard_tag}
                   onClick={(e) => e.stopPropagation()}
-                  onChange={(e) => updateNode(node.id, { scoreboard_tag: e.target.value.replace(/\s+/g, '') })}
+                  onChange={(e) => updateMessage(message.id, { scoreboard_tag: e.target.value.replace(/\s+/g, '') })}
                   className="w-16 px-2 py-1 text-sm font-semibold rounded-md border border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-900 focus:outline-none focus:ring-2 focus:ring-zinc-300 dark:focus:ring-zinc-600"
                 />
                 <div className="ml-auto flex items-center gap-2">
@@ -491,9 +491,9 @@ export default function NpcMaker() {
                     </span>
                   )}
                   <button
-                    onClick={(e) => { e.stopPropagation(); deleteNode(node.id) }}
+                    onClick={(e) => { e.stopPropagation(); deleteMessage(message.id) }}
                     className="p-1.5 rounded-md text-zinc-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-950 transition-colors"
-                    title="Delete node"
+                    title="Delete message"
                   >
                     <Trash2 size={15} />
                   </button>
@@ -504,29 +504,29 @@ export default function NpcMaker() {
               <div className="flex gap-2">
                 <MessageSquare size={15} className="mt-2 text-zinc-400 shrink-0" />
                 <textarea
-                  value={node.message}
+                  value={message.message}
                   onClick={(e) => e.stopPropagation()}
-                  onChange={(e) => updateNode(node.id, { message: e.target.value })}
+                  onChange={(e) => updateMessage(message.id, { message: e.target.value })}
                   rows={2}
-                  placeholder="What the NPC says on this node…"
+                  placeholder="What the NPC says on this message…"
                   className="w-full px-3 py-2 text-sm rounded-lg border border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-900 focus:outline-none focus:ring-2 focus:ring-zinc-300 dark:focus:ring-zinc-600 resize-y"
                 />
               </div>
 
               {/* Choices */}
               <div className="space-y-2 pl-6">
-                {node.choices.map((ch) => {
+                {message.choices.map((ch) => {
                   const linked = ch.direct && tagSet.has(ch.direct)
                   const invalid = ch.direct && !tagSet.has(ch.direct)
                   const isThisLinking =
-                    linking && linking.nodeId === node.id && linking.choiceId === ch.id
+                    linking && linking.messageId === message.id && linking.choiceId === ch.id
                   return (
                     <div key={ch.id} className="flex items-center gap-2">
                       <ChevronRight size={14} className="text-zinc-400 shrink-0" />
                       <input
                         value={ch.text}
                         onClick={(e) => e.stopPropagation()}
-                        onChange={(e) => updateChoice(node.id, ch.id, { text: e.target.value })}
+                        onChange={(e) => updateChoice(message.id, ch.id, { text: e.target.value })}
                         placeholder="Choice the player can click…"
                         className="flex-1 px-3 py-1.5 text-sm rounded-lg border border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-900 focus:outline-none focus:ring-2 focus:ring-zinc-300 dark:focus:ring-zinc-600"
                       />
@@ -535,9 +535,9 @@ export default function NpcMaker() {
                         <input
                           value={ch.direct}
                           onClick={(e) => e.stopPropagation()}
-                          onChange={(e) => updateChoice(node.id, ch.id, { direct: e.target.value.replace(/\s+/g, '') })}
-                          placeholder="node"
-                          title={invalid ? 'No node has this number (will be wired in-game)' : 'Target node'}
+                          onChange={(e) => updateChoice(message.id, ch.id, { direct: e.target.value.replace(/\s+/g, '') })}
+                          placeholder="message"
+                          title={invalid ? 'No message has this number (will be wired in-game)' : 'Target message'}
                           className={`w-16 px-2 py-1.5 text-sm rounded-lg border bg-zinc-50 dark:bg-zinc-900 focus:outline-none focus:ring-2 ${
                             invalid
                               ? 'border-red-400 dark:border-red-600 text-red-600 dark:text-red-400 focus:ring-red-300'
@@ -547,7 +547,7 @@ export default function NpcMaker() {
                           }`}
                         />
                         <button
-                          onClick={(e) => { e.stopPropagation(); startLinking(node.id, ch.id) }}
+                          onClick={(e) => { e.stopPropagation(); startLinking(message.id, ch.id) }}
                           className={`p-1.5 rounded-md transition-colors ${
                             isThisLinking
                               ? 'bg-indigo-100 dark:bg-indigo-900 text-indigo-600 dark:text-indigo-300'
@@ -558,7 +558,7 @@ export default function NpcMaker() {
                           <Crosshair size={15} />
                         </button>
                         <button
-                          onClick={(e) => { e.stopPropagation(); deleteChoice(node.id, ch.id) }}
+                          onClick={(e) => { e.stopPropagation(); deleteChoice(message.id, ch.id) }}
                           className="p-1.5 rounded-md text-zinc-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-950 transition-colors"
                           title="Remove choice"
                         >
@@ -569,7 +569,7 @@ export default function NpcMaker() {
                   )
                 })}
                 <button
-                  onClick={(e) => { e.stopPropagation(); addChoice(node.id) }}
+                  onClick={(e) => { e.stopPropagation(); addChoice(message.id) }}
                   className="flex items-center gap-1.5 text-xs font-medium text-zinc-500 dark:text-zinc-400 hover:text-zinc-800 dark:hover:text-zinc-200 transition-colors pl-0.5"
                 >
                   <Plus size={14} /> Add choice
@@ -579,9 +579,9 @@ export default function NpcMaker() {
           )
         })}
 
-        {/* Add node */}
+        {/* Add message */}
         <button
-          onClick={addNode}
+          onClick={addMessage}
           className="w-full flex items-center justify-center gap-2 py-4 text-sm font-medium text-zinc-400 dark:text-zinc-500 border-2 border-dashed border-zinc-200 dark:border-zinc-700 rounded-xl hover:border-zinc-300 dark:hover:border-zinc-600 hover:text-zinc-600 dark:hover:text-zinc-300 transition-colors"
         >
           <Plus size={16} /> Add message
@@ -625,7 +625,7 @@ export default function NpcMaker() {
       )}
       {!canGenerate && (
         <p className="text-xs text-zinc-400 dark:text-zinc-500">
-          Set a scoreboard prefix and give every node a number to generate the schematic.
+          Set a scoreboard prefix and give every message a number to generate the schematic.
         </p>
       )}
     </div>

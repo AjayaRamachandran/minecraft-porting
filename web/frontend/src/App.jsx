@@ -24,7 +24,7 @@ export default function App() {
   const Active = TOOLS.find((t) => t.key === tool).Component
 
   return (
-    <div className="min-h-screen flex bg-zinc-50 dark:bg-zinc-900 text-zinc-900 dark:text-zinc-100 antialiased transition-colors">
+    <div className="h-screen overflow-hidden flex bg-zinc-50 dark:bg-zinc-900 text-zinc-900 dark:text-zinc-100 antialiased transition-colors">
       {/* Left rail (Jira-style vertical tabs) */}
       <aside className="w-52 shrink-0 border-r border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-950 flex flex-col">
         <div className="px-4 py-4 border-b border-zinc-200 dark:border-zinc-800">
