@@ -1,3 +1,63 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+/* Body font — Mac's Minecraft (served from /public). */
+@font-face {
+  font-family: 'Minecraft';
+  src: url('/macs-Minecraft.otf') format('opentype');
+  font-weight: normal;
+  font-style: normal;
+  font-display: swap;
+}
+
+@layer base {
+  :root {
+    --p: 3px; /* the "pixel" unit: corner-step size AND border thickness */
+  }
+
+  /* Smaller overall scale + roomier kerning for the pixel body font. */
+  html {
+    font-size: 81.25%; /* 13px base */
+  }
+  body {
+    letter-spacing: 0.04em;
+  }
+  /* Code/JSON reads better tight and unscaled-spacing. */
+  .font-mono {
+    letter-spacing: 0;
+  }
+
+  /* Placeholders always use the pixel body font, even inside mono inputs. */
+  ::placeholder {
+    font-family: 'Minecraft', ui-sans-serif, system-ui, sans-serif !important;
+    letter-spacing: 0.04em;
+  }
+
+  /* Headings use Jacquard 12 (loaded via Google Fonts in index.html) and are
+     deliberately much larger than the body text. */
+  h1, h2, h3, h4, h5, h6 {
+    font-family: 'Jacquard 12', serif;
+    letter-spacing: normal;
+    line-height: 1.0;
+  }
+}
+
+@layer utilities {
+  /* Chunky, crisp borders — the Minecraft GUI look. Thickness == --p. */
+  .border {
+    border-width: var(--p);
+  }
+
+  /* Square corners (Minecraft GUIs are square, not rounded). We zero out the
+     rounded utilities rather than use clip-path: clip-path can't carry a border
+     along its edge AND it clips overflowing children (dropdowns, popovers),
+     which is exactly what we don't want. rounded-full is left alone so the
+     loading spinners stay circular. */
+  .rounded,
+  .rounded-md,
+  .rounded-lg,
+  .rounded-xl {
+    border-radius: 0 !important;
+  }
+}

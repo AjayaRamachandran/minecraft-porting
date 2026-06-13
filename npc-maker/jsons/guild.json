@@ -1,0 +1,323 @@
+{   
+    "npc_builder_version" : "1.0",
+    "npc_variable_initial" : "guild",
+    "conversations" : [
+        {
+            "scoreboard_tag" : "1",
+            "npc_name" : "Guildmaster",
+            "message" : "Oh great, another shiny recruit sent here by Raymon to get obliterated, how precious. I would recommend you scram while you still have the chance. If the guild members see you, youll be the laughing stock of Imperia. Who does Raymon think he is always sending us you weak little sea squirts, I bet you couldnt even trip down the first hall of Dungeon 1. What do you want?",
+            "choices" : [
+                {
+                    "text" : "Nothing, I was just going.",
+                    "direct" : "5"
+                },
+                {
+                    "text" : "I am here for a quest.",
+                    "direct" : "2"
+                },
+		        {
+                    "text" : "I am here to become a Guildsman.",
+                    "direct" : "3"
+                }
+            ]
+        },
+        {
+            "scoreboard_tag" : "2",
+            "npc_name" : "Guildmaster",
+            "message" : "Ha, goofy kid, I dont have any quests for you, come back when you have at least 25 health, then we will talk.",
+            "choices" : [
+                {
+                    "text" : "I know what I am doing.",
+                    "direct" : "4"
+                },
+                {
+                    "text" : "I will be back.",
+                    "direct" : "5"
+                }
+            ]
+        },
+        {
+            "scoreboard_tag" : "3",
+            "npc_name" : "Guildmaster",
+            "message" : "Is that so, and what makes you think that you deserve to be a Guildsman.",
+            "choices" : [
+                {
+                    "text" : "I beat Dungeon Three like you asked.",
+                    "direct" : "6"
+                },
+		        {
+                    "text" : "I am really powerful!",
+                    "direct" : "22"
+                }
+            ]
+        },
+	    {
+            "scoreboard_tag" : "4",
+            "npc_name" : "Guildmaster",
+            "message" : "Fine, here is what I got.",
+            "choices" : [
+                {
+                    "text" : "Dungeon 1",
+                    "direct" : "7"
+                },
+                {
+                    "text" : "Sheep Sheep and more Sheep",
+                    "direct" : "8"
+                },
+                {
+                    "text" : "Real Warrior?",
+                    "direct" : "9"
+                },
+                {
+                    "text" : "Dungeon 2",
+                    "direct" : "10"
+                },
+                {
+                    "text" : "Dungeon 3",
+                    "direct" : "11"
+                },
+                {
+                    "text" : "The Demon Realm",
+                    "direct" : "12"
+                },
+                {
+                    "text" : "The Patient One",
+                    "direct" : "13"
+                },
+		        {
+                    "text" : "Dragon Rage and the Rest",
+                    "direct" : "25"
+                },
+		        {
+                    "text" : "Revenge",
+                    "direct" : "27"
+                }
+            ]
+        },
+        {
+            "scoreboard_tag" : "6",
+            "npc_name" : "Guildmaster",
+            "message" : "Well I am stunned, I really never thought you would ever get to this point. You surprised me and I appreciate that. I guess this means that you are now a member of the Adventure Guild. Now dont just stand there like an idiot, go do something useful.",
+            "choices" : []
+        },
+	    {
+            "scoreboard_tag" : "7",
+            "npc_name" : "Guildmaster",
+            "message" : "Before you get to do anything else for me I want to see you make it through dungeon 1. Once you manage that, then we can talk.",
+            "choices" : [
+                {
+                    "text" : "Lets go!",
+                    "direct" : "15"
+                },
+		        {
+                    "text" : "I give up.",
+                    "direct" : "5"
+                }
+            ]
+        },
+	    {
+            "scoreboard_tag" : "8",
+            "npc_name" : "Guildmaster",
+            "message" : "Beginners Luck that you made it through Dungeon 1, even the most worthless Guildsman could do that blindfolded. If you are really dedicated to becoming a great warrior go get me some wool, and a lot of it.",
+            "choices" : [
+                {
+                    "text" : "You cannot dissuade me!",
+                    "direct" : "16"
+                },
+		        {
+                    "text" : "Maybe some other time",
+                    "direct" : "5"
+                }
+            ]
+        },
+	    {
+            "scoreboard_tag" : "9",
+            "npc_name" : "Guildmaster",
+            "message" : "What are you doing wasting your time getting wool you worthless wart. Come back in full Koathian Steel, then we will talk.",
+            "choices" : [
+                {
+                    "text" : "Lets go!",
+                    "direct" : "17"
+                },
+		        {
+                    "text" : "No way!",
+                    "direct" : "5"
+                }
+            ]
+        },
+	    {
+            "scoreboard_tag" : "10",
+            "npc_name" : "Guildmaster",
+            "message" : "Finally, it took you forever to get to this point. You have a long way to go before you are Guildsman material. Why dont you go poke around in Dungeon two for a day or so and try to learn a thing or two about survival.",
+            "choices" : [
+                {
+                    "text" : "I will show you!",
+                    "direct" : "18"
+                },
+		        {
+                    "text" : "Maybe some other time",
+                    "direct" : "5"
+                }
+            ]
+        },
+	    {
+            "scoreboard_tag" : "11",
+            "npc_name" : "Guildmaster",
+            "message" : "So you survived Dungeon 2, big deal, I could do that blindfolded with both my hands tied behind my back and a fifty pound explosive strapped to my chest. If you really want my respect then take down the War Rhino, that is the real trial of a Guildsman. Do that and I will think about your status.",
+            "choices" : [
+                {
+                    "text" : "Lets go!",
+                    "direct" : "19"
+                },
+		        {
+                    "text" : "Dungeon 3, that is crazy!",
+                    "direct" : "5"
+                }
+            ]
+        },
+	    {
+            "scoreboard_tag" : "12",
+            "npc_name" : "Guildmaster",
+            "message" : "Your first real Quest as a Guildsman, breathe it in and remember deep in your worthless little shriveled heart that I hate you with every ounce of my being and I have a hundred credits on your death during this mission. They say that there is a demon stronghold between Imperia and the Demon World where you can fight demons. Now if you want any chance of surviving I better see your ass in full Nebula Armor with a good weapon, because otherwise I will be winning 100 credits by the end of the night. And do not be stupid and click all the buttons either, just start with yellow one and come back.",
+            "choices" : [
+                {
+                    "text" : "I will not let you down!",
+                    "direct" : "20"
+                },
+		        {
+                    "text" : "I dont think I am ready for this.",
+                    "direct" : "24"
+                }
+            ]
+        },
+	    {
+            "scoreboard_tag" : "13",
+            "npc_name" : "Guildmaster",
+            "message" : "I would not normally give someone like you this quest but the last guy expired on his trip to Dungeon 1. Something about an unbeatable boss at the end of it. Not sure what that was all about, but maybe you could go down there and check it out, you know, to make sure it is not true.",
+            "choices" : [
+                {
+                    "text" : "Lets go!",
+                    "direct" : "21"
+                },
+		        {
+                    "text" : "No way!",
+                    "direct" : "23"
+                }
+            ]
+        },
+        {
+            "scoreboard_tag" : "25",
+            "npc_name" : "Guildmaster",
+            "message" : "Back to the Demon Realm for you, time to beat the Dragon Rage and Blood Demons. Good luck is all that can save you now.",
+            "choices" : [
+                {
+                    "text" : "Lets go!",
+                    "direct" : "26"
+                },
+		        {
+                    "text" : "No way!",
+                    "direct" : "23"
+                }
+            ]
+        },
+        {
+            "scoreboard_tag" : "27",
+            "npc_name" : "Guildmaster",
+            "message" : "I am sorry to ask this of you, but multiple of our members have recently been killed on an expedition to the Sunken Caverns. I need someone I know I can trust to go down there and clear out the monster that lives within.",
+            "choices" : [
+                {
+                    "text" : "I will not let you down!",
+                    "direct" : "28"
+                },
+		{
+                    "text" : "No way!",
+                    "direct" : "23"
+                }
+            ]
+        },
+        {
+            "scoreboard_tag" : "14",
+            "npc_name" : "Guildmaster",
+            "message" : "Shart",
+            "choices" : []
+        },
+        {
+            "scoreboard_tag" : "15",
+            "npc_name" : "Guildmaster",
+            "message" : "Shart",
+            "choices" : []
+        },
+        {
+            "scoreboard_tag" : "16",
+            "npc_name" : "Guildmaster",
+            "message" : "Shart",
+            "choices" : []
+        },
+        {
+            "scoreboard_tag" : "17",
+            "npc_name" : "Guildmaster",
+            "message" : "Shart",
+            "choices" : []
+        },
+        {
+            "scoreboard_tag" : "18",
+            "npc_name" : "Guildmaster",
+            "message" : "Shart",
+            "choices" : []
+        },
+        {
+            "scoreboard_tag" : "19",
+            "npc_name" : "Guildmaster",
+            "message" : "Shart",
+            "choices" : []
+        },
+        {
+            "scoreboard_tag" : "20",
+            "npc_name" : "Guildmaster",
+            "message" : "Shart",
+            "choices" : []
+        },
+        {
+            "scoreboard_tag" : "21",
+            "npc_name" : "Guildmaster",
+            "message" : "Shart",
+            "choices" : []
+        },
+        {
+            "scoreboard_tag" : "26",
+            "npc_name" : "Guildmaster",
+            "message" : "Shart",
+            "choices" : []
+        },
+        {
+            "scoreboard_tag" : "28",
+            "npc_name" : "Guildmaster",
+            "message" : "Shart",
+            "choices" : []
+        },
+        {
+            "scoreboard_tag" : "22",
+            "npc_name" : "Guildmaster",
+            "message" : "Sure, you are just about powerful enough to battle my pinky toe, come ask me again when you have defeated Dungeon Three.",
+            "choices" : []
+        },
+        {
+            "scoreboard_tag" : "24",
+            "npc_name" : "Guildmaster",
+            "message" : "That is what I thought, now run on back home and get yourself some better gear.",
+            "choices" : []
+        },
+        {
+            "scoreboard_tag" : "23",
+            "npc_name" : "Guildmaster",
+            "message" : "After all that fluff, what did I bother making you a Guildsman for?",
+            "choices" : []
+        },
+        {
+            "scoreboard_tag" : "5",
+            "npc_name" : "Guildmaster",
+            "message" : "Wuss! Dont come back until you have made something of yourself. Oh and dont forget to close the door on your way out.",
+            "choices" : []
+        }
+    ]
+}

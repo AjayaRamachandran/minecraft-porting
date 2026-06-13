@@ -6,16 +6,18 @@ import sys
 import tempfile
 from pathlib import Path
 
-from fastapi import FastAPI, File, Form, HTTPException, UploadFile
+from fastapi import Body, FastAPI, File, Form, HTTPException, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
 # Locate converter package relative to web/backend/
 _ROOT = Path(__file__).resolve().parent.parent.parent
 sys.path.insert(0, str(_ROOT / "convert_villager"))
+sys.path.insert(0, str(_ROOT / "npc-maker"))
 
 from converter.cli import build_pipeline, process_mcfunction_file  # noqa: E402
 from converter.implementors import schematic_file  # noqa: E402
+import builder as npc_builder  # noqa: E402  (npc-maker/builder.py)
 
 PACK_DIR = _ROOT / "1_21_11_pack"
 OLD_PACK_DIR = _ROOT / "1_20_1_pack"
@@ -33,6 +35,36 @@ app.add_middleware(
 @app.get("/api/health")
 def health():
     return {"status": "ok", "pack": str(PACK_DIR), "old_pack": str(OLD_PACK_DIR)}
+
+
+@app.post("/api/npc/generate")
+def npc_generate(payload: dict = Body(...)) -> JSONResponse:
+    """Build a 1.21.11 NPC schematic from editor/JSON state.
+
+    Accepts either builder format (1.0 legacy or 1.1); the result is migrated to
+    1.1. Returns the ``.schem`` (base64), the normalized 1.1 JSON, and the
+    human-readable command listing.
+    """
+    import mcschematic  # noqa: PLC0415
+
+    try:
+        normalized = npc_builder.normalize(payload)
+        schem, commands = npc_builder.build(payload)
+    except Exception as exc:  # noqa: BLE001
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+    name = normalized.get("npc_variable_initial") or "npc"
+    version = getattr(mcschematic.Version, npc_builder.SCHEM_VERSION_NAME)
+    with tempfile.TemporaryDirectory() as tmpdir:
+        schem.save(tmpdir, name, version)
+        raw = (Path(tmpdir) / f"{name}.schem").read_bytes()
+
+    return JSONResponse({
+        "filename": f"{name}.schem",
+        "schem_base64": base64.b64encode(raw).decode(),
+        "normalized": normalized,
+        "commands": commands,
+    })
 
 
 @app.post("/api/convert")

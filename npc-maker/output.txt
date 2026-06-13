@@ -1,0 +1,61 @@
+Below are the commands for your NPC. The first in each group runs in a repeat command block, the others in chain.
+
+Commands for Onk the Explorer (node 1)
+
+/execute as @a[scores={onk1=1}] run tellraw @s [{"text":"[Onk the Explorer]","color":"gold"},{"text":" Greetings my fellow adventurer! Is there a humble quest on which you wish to embark today?","color":"white"}]
+/execute as @a[scores={onk1=1}] run tellraw @s {"text":"> [Show me what you got!]","color":"light_purple","click_event":{"action":"run_command","command":"/trigger onk2"}}
+/execute as @a[scores={onk1=1}] run tellraw @s {"text":"> [No thank you!]","color":"light_purple","click_event":{"action":"run_command","command":"/trigger onk3"}}
+/execute as @a[scores={onk1=1}] run scoreboard players set @s onk1 0
+
+Commands for Onk the Explorer (node 2)
+
+/execute as @a[scores={onk2=1}] run tellraw @s [{"text":"[Onk the Explorer]","color":"gold"},{"text":" I always knew you were up for the challenge. Click a mission below to get started!","color":"white"}]
+/execute as @a[scores={onk2=1}] run tellraw @s {"text":"> [Mission 1: The Creepy Crypt]","color":"light_purple","click_event":{"action":"run_command","command":"/trigger onk4"}}
+/execute as @a[scores={onk2=1}] run tellraw @s {"text":"> [Mission 2: The Cultic Lair]","color":"light_purple","click_event":{"action":"run_command","command":"/trigger onk5"}}
+/execute as @a[scores={onk2=1}] run tellraw @s {"text":"> [Mission 3: The Big Dig]","color":"light_purple","click_event":{"action":"run_command","command":"/trigger onk6"}}
+/execute as @a[scores={onk2=1}] run tellraw @s {"text":"> [Mission 4: The Lost School of the Alchemists]","color":"light_purple","click_event":{"action":"run_command","command":"/trigger onk7"}}
+/execute as @a[scores={onk2=1}] run scoreboard players set @s onk2 0
+
+Commands for Onk the Explorer (node 3)
+
+/execute as @a[scores={onk3=1}] run tellraw @s [{"text":"[Onk the Explorer]","color":"gold"},{"text":" That is too bad, my friend. We will cross paths again soon!","color":"white"}]
+/execute as @a[scores={onk3=1}] run scoreboard players set @s onk3 0
+
+Commands for Onk the Explorer (node 4)
+
+/execute as @a[scores={onk4=1}] run tellraw @s [{"text":"[Onk the Explorer]","color":"gold"},{"text":" The remains of the eldest member of the Magdalis family was buried in the soils of this very crypt. Legend says that with his corpse lies the most exquisite ruby ring in all the land, imbued with powerful and ancient magic. Search the crypt and return the ring to me for a great reward!","color":"white"}]
+/execute as @a[scores={onk4=1}] run tellraw @s {"text":"> [I am ready!]","color":"light_purple","click_event":{"action":"run_command","command":"/trigger onk8"}}
+/execute as @a[scores={onk4=1}] run tellraw @s {"text":"> [I am not feeling up to this.]","color":"light_purple","click_event":{"action":"run_command","command":"/trigger onk3"}}
+/execute as @a[scores={onk4=1}] run scoreboard players set @s onk4 0
+
+Commands for Onk the Explorer (node 5)
+
+/execute as @a[scores={onk5=1}] run tellraw @s [{"text":"[Onk the Explorer]","color":"gold"},{"text":" Many decades ago, when Imperia was still young, the Blood Cult had a secret lair hidden outside of the walls of Calaphis, working on a terrifying Dark Artifact capable of destroying Imperia. In that lair they practiced other dark rituals until one ritual went awry and the location, with the Artifact, was abandoned. Enter there and return their Dark Artifact to me.","color":"white"}]
+/execute as @a[scores={onk5=1}] run tellraw @s {"text":"> [I am ready!]","color":"light_purple","click_event":{"action":"run_command","command":"/trigger onk9"}}
+/execute as @a[scores={onk5=1}] run tellraw @s {"text":"> [I am not feeling up to this.]","color":"light_purple","click_event":{"action":"run_command","command":"/trigger onk3"}}
+/execute as @a[scores={onk5=1}] run scoreboard players set @s onk5 0
+
+Commands for Onk the Explorer (node 6)
+
+/execute as @a[scores={onk6=1}] run tellraw @s [{"text":"[Onk the Explorer]","color":"gold"},{"text":" The Imperian army is currently developing a great organism that is a hybrid of human and its long-lost relative, the Praedorian Ape. With its fierce jaws and terrifying muscle power, these would join with human intelligence to create an unstoppable beast. Locate the fossil of this extinct creature and bring it to me.","color":"white"}]
+/execute as @a[scores={onk6=1}] run tellraw @s {"text":"> [I am ready!]","color":"light_purple","click_event":{"action":"run_command","command":"/trigger onk10"}}
+/execute as @a[scores={onk6=1}] run tellraw @s {"text":"> [I am not feeling up to this.]","color":"light_purple","click_event":{"action":"run_command","command":"/trigger onk3"}}
+/execute as @a[scores={onk6=1}] run scoreboard players set @s onk6 0
+
+Commands for Onk the Explorer (node 7)
+
+/execute as @a[scores={onk7=1}] run tellraw @s [{"text":"[Onk the Explorer]","color":"gold"},{"text":" Long before the modern world, the Alchemists lived deep within the confines of what is now Imperia. Those acquainted with the Dark Art passed their skills down to their young in the Ancient School. When the School was pillaged by Imperian forces, the art of Alchemy was lost forever. We think the only way to resurrect it is to find the Crystal Spore hidden in that Academy.","color":"white"}]
+/execute as @a[scores={onk7=1}] run tellraw @s {"text":"> [I am ready!]","color":"light_purple","click_event":{"action":"run_command","command":"/trigger onk11"}}
+/execute as @a[scores={onk7=1}] run tellraw @s {"text":"> [I am not feeling up to this.]","color":"light_purple","click_event":{"action":"run_command","command":"/trigger onk3"}}
+/execute as @a[scores={onk7=1}] run scoreboard players set @s onk7 0
+
+
+You will need to initialize your NPCs with the following commands.
+
+/scoreboard objectives add onk1 trigger
+/scoreboard objectives add onk2 trigger
+/scoreboard objectives add onk3 trigger
+/scoreboard objectives add onk4 trigger
+/scoreboard objectives add onk5 trigger
+/scoreboard objectives add onk6 trigger
+/scoreboard objectives add onk7 trigger

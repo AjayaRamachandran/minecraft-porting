@@ -1,0 +1,34 @@
+{
+    "npc_builder_version" : "1.0",
+    "npc_variable_initial" : "test",
+    "conversations" : [
+        {
+            "scoreboard_tag" : "1",
+            "npc_name" : "Test",
+            "message" : "Say less.",
+            "choices" : [
+                {
+                    "text" : "Less",
+                    "direct" : "2"
+                }
+            ]
+        },
+        {
+            "scoreboard_tag" : "2",
+            "npc_name" : "Test",
+            "message" : "Smartass.",
+            "choices" : [
+                {
+                    "text" : "My ass is so smart.",
+                    "direct" : "3"
+                }
+            ]
+        },
+        {
+            "scoreboard_tag" : "3",
+            "npc_name" : "Test",
+            "message" : "You should leave!",
+            "choices" : []
+        }
+    ]
+}

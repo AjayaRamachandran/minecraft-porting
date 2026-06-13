@@ -1,0 +1,264 @@
+{
+    "npc_builder_version" : "1.0",
+    "npc_variable_initial" : "guide",
+    "conversations" : [
+        {
+            "scoreboard_tag" : "1",
+            "npc_name" : "Guide",
+            "message" : "Welcome to Imperia, you arent from around here, are you?",
+            "choices" : [
+                {
+                    "text" : "No",
+                    "direct" : "2"
+                },
+                {
+                    "text" : "I have been here for a while",
+                    "direct" : "3"
+                }
+            ]
+        },
+        {
+            "scoreboard_tag" : "2",
+            "npc_name" : "Guide",
+            "message" : "Well Imperia is a land of peace and prosperity, an adventurer like yourself will be very successful here. Say, I have a few quests of my own for you if you are up to the task?",
+            "choices" : [
+                {
+                    "text" : "What have you got?",
+                    "direct" : "4"
+                },
+                {
+                    "text" : "Maybe some other time",
+                    "direct" : "5"
+                }
+            ]
+        },
+        {
+            "scoreboard_tag" : "3",
+            "npc_name" : "Guide",
+            "message" : "Then you are back for another quest I take it?",
+            "choices" : [
+                {
+                    "text" : "That is right!",
+                    "direct" : "4"
+                },
+		{
+                    "text" : "No, I am just here to mess with you",
+                    "direct" : "5"
+                }
+            ]
+        },
+	    {
+            "scoreboard_tag" : "4",
+            "npc_name" : "Guide",
+            "message" : "I am delighted you have taken up the task, we need more young warriors like you. Click a mission below to get started.",
+            "choices" : [
+                {
+                    "text" : "Adventurers First Weapon",
+                    "direct" : "6"
+                },
+                {
+                    "text" : "The Caves in Granite Hills",
+                    "direct" : "7"
+                },
+                {
+                    "text" : "Thieves and Scammers",
+                    "direct" : "8"
+                },
+                {
+                    "text" : "Magic Pigs!",
+                    "direct" : "9"
+                },
+                {
+                    "text" : "Rise of Warriors",
+                    "direct" : "10"
+                },
+                {
+                    "text" : "The Battalion Chief",
+                    "direct" : "11"
+                },
+                {
+                    "text" : "The Tavernkeep",
+                    "direct" : "12"
+                },
+                {
+                    "text" : "The Adventure Guild",
+                    "direct" : "13"
+                }
+            ]
+        },
+        {
+            "scoreboard_tag" : "6",
+            "npc_name" : "Guide",
+            "message" : "Before you start your journey youll need some good armor and a weapon to make sure you done die on your quests. You will have to get the armor on your own but if you bring me back some materials I can probably get you a nice knife.",
+            "choices" : [
+                {
+                    "text" : "Lets go!",
+                    "direct" : "14"
+                },
+		        {
+                    "text" : "Maybe some other time",
+                    "direct" : "5"
+                }
+            ]
+        },
+	    {
+            "scoreboard_tag" : "7",
+            "npc_name" : "Guide",
+            "message" : "Out in the Southern Countryside of Imperia there is a cute little mining town of Granite Hills. I heard they are extracting some really nice ore from there, maybe you could get your hands on some?",
+            "choices" : [
+                {
+                    "text" : "Lets go!",
+                    "direct" : "15"
+                },
+		        {
+                    "text" : "Maybe some other time",
+                    "direct" : "5"
+                }
+            ]
+        },
+	    {
+            "scoreboard_tag" : "8",
+            "npc_name" : "Guide",
+            "message" : "Undoubtedly in your travels you have seen lots of traders, but not every one is as honest as they seem. It is important to know what kinds of folks sell you real gear and what type might not be as kind.",
+            "choices" : [
+                {
+                    "text" : "Lets go!",
+                    "direct" : "16"
+                },
+		        {
+                    "text" : "Maybe some other time",
+                    "direct" : "5"
+                }
+            ]
+        },
+	    {
+            "scoreboard_tag" : "9",
+            "npc_name" : "Guide",
+            "message" : "I heard a little west of the town of Red Rock there are pigs in the hills that glow and drop magic crystals. I would like one for my collection, could you get one for me?",
+            "choices" : [
+                {
+                    "text" : "Lets go!",
+                    "direct" : "17"
+                },
+		        {
+                    "text" : "Maybe some other time",
+                    "direct" : "5"
+                }
+            ]
+        },
+	    {
+            "scoreboard_tag" : "10",
+            "npc_name" : "Guide",
+            "message" : "I am impressed by your progress, you have come a long way since when we first talked. But I think it is time that you leveled up. I think you should check out the Rise of Warriors shop by the Colosseum, they have some nice gear there that might tickle your fancy.",
+            "choices" : [
+                {
+                    "text" : "Lets go!",
+                    "direct" : "18"
+                },
+		        {
+                    "text" : "Maybe some other time",
+                    "direct" : "5"
+                }
+            ]
+        },
+	    {
+            "scoreboard_tag" : "11",
+            "npc_name" : "Guide",
+            "message" : "You are really wrapping up everything that I have for you here, I never could have hoped to get this much done so quickly. I think I will refer you to the Battalion Chief over in Central District, I heard he is looking for some brave warriors to do some work for him. But be warned, these quests are going to be much harder than what you have done for me. You are moving up to the big leagues now so make sure you are properly equipped.",
+            "choices" : [
+                {
+                    "text" : "Lets go!",
+                    "direct" : "19"
+                },
+		        {
+                    "text" : "Maybe some other time",
+                    "direct" : "5"
+                }
+            ]
+        },
+	    {
+            "scoreboard_tag" : "12",
+            "npc_name" : "Guide",
+            "message" : "I assume the Battalion Chief has nothing else for you huh. Well, I have a friend named Onk who recently opened up a tavern in Andrecalis, maybe he has something for you to do.",
+            "choices" : [
+                {
+                    "text" : "Sounds Interesting!",
+                    "direct" : "20"
+                },
+		        {
+                    "text" : "Maybe some other time",
+                    "direct" : "5"
+                }
+            ]
+        },
+	    {
+            "scoreboard_tag" : "13",
+            "npc_name" : "Guide",
+            "message" : "I didnt expect to see you back. You really are an excellent warrior. If you made it this far I have faith you can make it anywhere. I am sending you off to the Adventurers Guild, I believe that you are the type of warrior they are looking for.",
+            "choices" : [
+                {
+                    "text" : "Lets go!",
+                    "direct" : "21"
+                },
+		        {
+                    "text" : "No way!",
+                    "direct" : "5"
+                }
+            ]
+        },
+        {
+            "scoreboard_tag" : "14",
+            "npc_name" : "Guide",
+            "message" : "Shart",
+            "choices" : []
+        },
+        {
+            "scoreboard_tag" : "15",
+            "npc_name" : "Guide",
+            "message" : "Shart",
+            "choices" : []
+        },
+        {
+            "scoreboard_tag" : "16",
+            "npc_name" : "Guide",
+            "message" : "Shart",
+            "choices" : []
+        },
+        {
+            "scoreboard_tag" : "17",
+            "npc_name" : "Guide",
+            "message" : "Shart",
+            "choices" : []
+        },
+        {
+            "scoreboard_tag" : "18",
+            "npc_name" : "Guide",
+            "message" : "Shart",
+            "choices" : []
+        },
+        {
+            "scoreboard_tag" : "19",
+            "npc_name" : "Guide",
+            "message" : "Shart",
+            "choices" : []
+        },
+        {
+            "scoreboard_tag" : "20",
+            "npc_name" : "Guide",
+            "message" : "Shart",
+            "choices" : []
+        },
+        {
+            "scoreboard_tag" : "21",
+            "npc_name" : "Guide",
+            "message" : "Shart",
+            "choices" : []
+        },
+        {
+            "scoreboard_tag" : "5",
+            "npc_name" : "Guide",
+            "message" : "Thats too bad, safe travels. I hope to see you again soon for another quest.",
+            "choices" : []
+        }
+    ]
+}

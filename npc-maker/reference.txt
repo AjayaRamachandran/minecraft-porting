@@ -1,0 +1,12 @@
+/execute as @a[scores={BattalionChiefHello=1}] run tellraw @s [{"text":"[Battalion Chief]","color":"gold"},{"text":" Greetings Warrior. Adventure awaits you. Choose a mission below to get started.","color":"white"}]
+/execute as @a[scores={BattalionChiefHello=1}] run tellraw @s {"text":"> [Mission 1: Temple of Massuis]","color":"light_purple","clickEvent":{"action":"run_command","value":"/trigger Mission1"}}
+/execute as @a[scores={BattalionChiefHello=1}] run tellraw @s {"text":"> [Mission 2: Cordryn's Cove]","color":"light_purple","clickEvent":{"action":"run_command","value":"/trigger Mission2"}}
+/execute as @a[scores={BattalionChiefHello=1}] run tellraw @s {"text":"> [Mission 3: Knights of the Old Guard]","color":"light_purple","clickEvent":{"action":"run_command","value":"/trigger Mission3"}}
+/execute as @a[scores={BattalionChiefHello=1}] run tellraw @s {"text":"> [Mission 3: Knights of the Old Guard]","color":"light_purple","clickEvent":{"action":"run_command","value":"/trigger Mission3"}}
+/execute as @a[scores={BattalionChiefHello=1}] run tellraw @s {"text":"> [Mission 4: Ship of Dreams]","color":"light_purple","clickEvent":{"action":"run_command","value":"/trigger Mission4"}}
+/execute as @a[scores={BattalionChiefHello=1}] run tellraw @s {"text":"> [Mission 5: The Plunge]","color":"light_purple","clickEvent":{"action":"run_command","value":"/trigger Mission5"}}
+/execute as @a[scores={BattalionChiefHello=1}] run tellraw @s [{"text":"[Battalion Chief]","color":"gold"},{"text":" If you change your mind, you can always come back to this menu or pay my office a visit.","color":"white"}]
+/execute as @a[scores={BattalionChiefHello=1}] run scoreboard players set @s BattalionChiefHello 0
+/scoreboard players enable @a BattalionChiefHello
+
+/execute as @a[scores={serg1=1}] run tellraw @s [{"text":"[Serg]","color":"gold"},{"text":" Hello my friend. How are you doing today?","color":"white"}]

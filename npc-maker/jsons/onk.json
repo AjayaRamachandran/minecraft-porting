@@ -1,0 +1,111 @@
+{   
+    "npc_builder_version" : "1.0",
+    "npc_variable_initial" : "onk",
+    "conversations" : [
+        {
+            "scoreboard_tag" : "1",
+            "npc_name" : "Onk the Explorer",
+            "message" : "Greetings my fellow adventurer! Is there a humble quest on which you wish to embark today?",
+            "choices" : [
+                {
+                    "text" : "Show me what you got!",
+                    "direct" : "2"
+                },
+                {
+                    "text" : "No thank you!",
+                    "direct" : "3"
+                }
+            ]
+        },
+        {
+            "scoreboard_tag" : "2",
+            "npc_name" : "Onk the Explorer",
+            "message" : "I always knew you were up for the challenge. Click a mission below to get started!",
+            "choices" : [
+                {
+                    "text" : "Mission 1: The Creepy Crypt",
+                    "direct" : "4"
+                },
+                {
+                    "text" : "Mission 2: The Cultic Lair",
+                    "direct" : "5"
+                },
+                {
+                    "text" : "Mission 3: The Big Dig",
+                    "direct" : "6"
+                },
+                {
+                    "text" : "Mission 4: The Lost School of the Alchemists",
+                    "direct" : "7"
+                }
+            ]
+        },
+        {
+            "scoreboard_tag" : "3",
+            "npc_name" : "Onk the Explorer",
+            "message" : "That is too bad, my friend. We will cross paths again soon!",
+            "choices" : [
+            ]
+        },
+        {
+            "scoreboard_tag" : "4",
+            "npc_name" : "Onk the Explorer",
+            "message" : "The remains of the eldest member of the Magdalis family was buried in the soils of this very crypt. Legend says that with his corpse lies the most exquisite ruby ring in all the land, imbued with powerful and ancient magic. Search the crypt and return the ring to me for a great reward!",
+            "choices" : [
+                {
+                    "text" : "I am ready!",
+                    "direct" : "8"
+                },
+                {
+                    "text" : "I am not feeling up to this.",
+                    "direct" : "3"
+                }
+            ]
+        },
+        {
+            "scoreboard_tag" : "5",
+            "npc_name" : "Onk the Explorer",
+            "message" : "Many decades ago, when Imperia was still young, the Blood Cult had a secret lair hidden outside of the walls of Calaphis, working on a terrifying Dark Artifact capable of destroying Imperia. In that lair they practiced other dark rituals until one ritual went awry and the location, with the Artifact, was abandoned. Enter there and return their Dark Artifact to me.",
+            "choices" : [
+                {
+                    "text" : "I am ready!",
+                    "direct" : "9"
+                },
+                {
+                    "text" : "I am not feeling up to this.",
+                    "direct" : "3"
+                }
+            ]
+        },
+        {
+            "scoreboard_tag" : "6",
+            "npc_name" : "Onk the Explorer",
+            "message" : "The Imperian army is currently developing a great organism that is a hybrid of human and its long-lost relative, the Praedorian Ape. With its fierce jaws and terrifying muscle power, these would join with human intelligence to create an unstoppable beast. Locate the fossil of this extinct creature and bring it to me.",
+            "choices" : [
+                {
+                    "text" : "I am ready!",
+                    "direct" : "10"
+                },
+                {
+                    "text" : "I am not feeling up to this.",
+                    "direct" : "3"
+                }
+            ]
+        },
+        {
+            "scoreboard_tag" : "7",
+            "npc_name" : "Onk the Explorer",
+            "message" : "Long before the modern world, the Alchemists lived deep within the confines of what is now Imperia. Those acquainted with the Dark Art passed their skills down to their young in the Ancient School. When the School was pillaged by Imperian forces, the art of Alchemy was lost forever. We think the only way to resurrect it is to find the Crystal Spore hidden in that Academy.",
+            "choices" : [
+                {
+                    "text" : "I am ready!",
+                    "direct" : "11"
+                },
+                {
+                    "text" : "I am not feeling up to this.",
+                    "direct" : "3"
+                }
+            ]
+        }
+    ]
+}

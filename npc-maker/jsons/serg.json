@@ -1,0 +1,53 @@
+{
+    "npc_builder_version" : "0.9",
+    "conversations" : 
+    [
+        {
+            "scoreboard_tag" : "serg1",
+            "npc_name" : "Serg",
+            "message" : "Hello my friend. How are you doing today?",
+            "choices" : [
+                {
+                    "text" : "Great!",
+                    "direct" : "serg3"
+                },
+                {
+                    "text" : "Not great.",
+                    "direct" : "serg2"
+                }
+            ]
+        },
+        {
+            "scoreboard_tag" : "serg2",
+            "npc_name" : "Serg",
+            "message" : "Aw, that is too bad. Is there anything I can do to make it better?",
+            "choices" : [
+                {
+                    "text" : "I do not think so. Have a nice day!",
+                    "direct" : "serg4"
+                },
+                {
+                    "text" : "I am feeling better already!",
+                    "direct" : "serg3"
+                }
+            ]
+        },
+        {
+            "scoreboard_tag" : "serg3",
+            "npc_name" : "Serg",
+            "message" : "That is wonderful! I will see you around.",
+            "choices" : [
+                {
+                    "text" : "Bye bye!",
+                    "direct" : "serg4"
+                }
+            ]
+        },
+        {
+            "scoreboard_tag" : "serg4",
+            "npc_name" : "Serg",
+            "message" : "Bye!",
+            "choices" : []
+        }
+    ]
+}

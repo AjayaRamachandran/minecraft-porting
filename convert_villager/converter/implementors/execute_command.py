@@ -26,7 +26,8 @@ from __future__ import annotations
 import re
 from typing import Optional
 
-from ..snbt import Str, snbt_dump
+from ..command_parsing import split_top_level_nbt
+from ..snbt import Str, snbt_dump, snbt_parse
 from ..text_components import convert_text_component
 
 
@@ -146,6 +147,13 @@ _ACTIVE_EFFECTS_RE = re.compile(
     r'ActiveEffects:\[\s*\{\s*Id\s*:\s*(\d+)\s*,\s*Amplifier\s*:\s*(\d+b)\s*\}\s*\]'
 )
 
+# Matches "run give <target> <item_id>" — captures item name (no namespace) so we can
+# grab the trailing NBT block and convert it via the item pipeline.
+_RUN_GIVE_RE = re.compile(
+    r'(run\s+/?give\s+\S+\s+(?:minecraft:)?([a-z0-9_./]+))',
+    re.IGNORECASE,
+)
+
 # Matches "run tellraw <target> <json-payload>" in an execute command
 _TELLRAW_RE = re.compile(
     r'(\brun\s+/?tellraw\s+\S+\s+)(\{.+|\[.+)',
@@ -217,6 +225,38 @@ def _replace_cmd_in_clear(cmd_str: str, pipeline) -> str:
     return "".join(parts)
 
 
+def _convert_run_give(cmd: str, pipeline) -> str:
+    """Convert the item NBT block in a ``run give`` sub-command."""
+    m = _RUN_GIVE_RE.search(cmd)
+    if not m:
+        return cmd
+
+    item_raw = m.group(2).lower()
+    # Defer special items — same guards as give_command.py
+    if item_raw.endswith("_spawn_egg") or item_raw == "spawn_egg":
+        return cmd
+    if item_raw in ("spawner", "trial_spawner"):
+        return cmd
+
+    rest = cmd[m.end():]
+    nbt_text, trailing = split_top_level_nbt(rest)
+    if nbt_text is None:
+        return cmd
+
+    tag = snbt_parse(nbt_text)
+    if not isinstance(tag, dict):
+        return cmd
+
+    tag.pop("EntityTag", None)
+    tag.pop("BlockEntityTag", None)
+
+    item_id = f"minecraft:{item_raw}" if ":" not in item_raw else item_raw
+    comps = pipeline.item.convert_tag_to_components(tag, item_id, ctx=f"execute/run_give/{item_raw}")
+    block = pipeline.item.render_components_bracket(dict(sorted(comps.items())))
+
+    return cmd[:m.end()] + block + trailing
+
+
 def _transform_nbt_selector(cmd: str, pipeline) -> str:
     """Apply all legacy transforms to a command string."""
 
@@ -267,6 +307,9 @@ def _transform_nbt_selector(cmd: str, pipeline) -> str:
         converted = convert_text_component(Str(m.group(2), "'"))
         if not isinstance(converted, Str):
             cmd = cmd[:m.start(2)] + snbt_dump(converted)
+
+    # 9. run give <target> <item>{old_tag} → converted components bracket
+    cmd = _convert_run_give(cmd, pipeline)
 
     return cmd
 
