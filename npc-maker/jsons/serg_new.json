@@ -1,0 +1,52 @@
+{
+  "builder_version": "1.2",
+  "npc_variable_initial": "serg",
+  "npc_name": "Serg",
+  "name_color": "green",
+  "conversations": [
+    {
+      "scoreboard_tag": "1",
+      "message": "Hello traveler. I am Serg, the Bounty Dealer.",
+      "choices": [
+        {
+          "text": "Hi there.",
+          "direct": "2"
+        }
+      ]
+    },
+    {
+      "scoreboard_tag": "2",
+      "message": "It is great to see you. Can I interest you in my bounties?",
+      "choices": [
+        {
+          "text": "Sure!",
+          "direct": "4"
+        },
+        {
+          "text": "I'm not interested.",
+          "direct": "3"
+        }
+      ]
+    },
+    {
+      "scoreboard_tag": "3",
+      "message": "Alrighty then. I'll see you around next time, warrior!",
+      "choices": []
+    },
+    {
+      "scoreboard_tag": "4",
+      "message": "I'm a bounty dealer! Once you have completed some objective or quest, you come to me with a bounty ticket which confirms you've completed it. I give you little rewards in return! Click me to see the latest bounties I offer.",
+      "choices": []
+    },
+    {
+      "scoreboard_tag": "5",
+      "message": "Welcome back, warrior! Click me to see what new bounties I offer.",
+      "choices": [
+        {
+          "text": "Could you explain to me what you do again?",
+          "direct": "4"
+        }
+      ]
+    }
+  ]
+}

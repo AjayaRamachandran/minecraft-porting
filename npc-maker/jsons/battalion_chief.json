@@ -1,0 +1,114 @@
+{
+  "builder_version": "1.2",
+  "npc_variable_initial": "battalionchief",
+  "npc_name": "Battalion Chief",
+  "name_color": "gold",
+  "conversations": [
+    {
+      "scoreboard_tag": "1",
+      "message": "Greetings Warrior. Adventure awaits you. Choose a mission below to get started. If you change your mind, you can always come back to this menu or pay my office a visit.",
+      "choices": [
+        {
+          "text": "Mission 1: Temple of Massuis",
+          "direct": "2"
+        },
+        {
+          "text": "Mission 2: Cordryn's Cove",
+          "direct": "3"
+        },
+        {
+          "text": "Mission 3: Knights of the Old Guard",
+          "direct": "4"
+        },
+        {
+          "text": "Mission 4: Ship of Dreams",
+          "direct": "5"
+        },
+        {
+          "text": "Mission 5: The Plunge",
+          "direct": "6"
+        }
+      ]
+    },
+    {
+      "scoreboard_tag": "2",
+      "message": "A long time ago, there was a terrible King that ruled over this place, by the name of Massuis. Now he lived an extremely long life--over 300 years--which many believe was lengthened by his trusty Vitalis stone. When Massuis's tyrannical government was overthrown over a hundred years ago, he was killed by an angry mob. His followers fled the country, erecting a temple in his name some many thousands of miles from here. We've been searching for the Vitalis stone for decades now, and that's the last place we think it could be. You need to get in there, get the stone, and get out, before what's left of his followers get to you.",
+      "choices": [
+        {
+          "text": "Sign me up.",
+          "direct": "7"
+        },
+        {
+          "text": "I'm not feeling up to this.",
+          "direct": "8"
+        }
+      ]
+    },
+    {
+      "scoreboard_tag": "3",
+      "message": "Ah, Cordryn. The leader of the Revolution against Massuis. After the empire was overthrown, you'd think he'd-a built himself a castle and ruled the place himself. But he went down to the coast and lived in a cove for the rest of his years, 'e did. Good fella. Some say while he lived there, Cordryn was working on some magic Arcane-jewel called a Tiezure--never 'eard of such a thing. But I've been told it has the ability to summon hordes of minions on command. Now, our beloved King Bogg--he'd love a stone like that. So what you're going to do, you're going to head on down to the shore and retrieve this Tiezure for us. You might have to fight some of those minions to get it, though. You with me?",
+      "choices": [
+        {
+          "text": "Sounds great!",
+          "direct": "7"
+        },
+        {
+          "text": "No, I'm not ready for this.",
+          "direct": "8"
+        }
+      ]
+    },
+    {
+      "scoreboard_tag": "4",
+      "message": "After Massuis's fall, the leaders had to set up a provisional government until they figured everything out. Some group that had a duty to serve the country, and already had a taste for leading. They picked the perfect people for the job--they rounded up the 7 military generals and created the Old Guard. These Arcane knights had the power of magic and military on their side, and in the two years they governed this country we conquered unprecedented amounts of land. But now, all but one are dead. And we believe that he is the last piece in our journey to understand how to harness the Arcane. We think we know his last place of residence. Rummage around there and see what you can find.",
+      "choices": [
+        {
+          "text": "Sounds like a plan.",
+          "direct": "7"
+        },
+        {
+          "text": "I'm not feeling it.",
+          "direct": "8"
+        }
+      ]
+    },
+    {
+      "scoreboard_tag": "5",
+      "message": "They called it the Fear-not. Vetruvia was its real name. It was the fastest ship known to humanity. Not because of its beautiful engineering, of course, but because its engine was powered by the Arcane magic of centuries-old. We just discovered that Cordryn's Tiezure needs an Arcane Activator to work, and the steps on how to make one--or better yet, a real Activator itself--might be right in the engine of that ship. You need to go there and find it.",
+      "choices": [
+        {
+          "text": "When do I start?",
+          "direct": "7"
+        },
+        {
+          "text": "No way. Not doing that.",
+          "direct": "8"
+        }
+      ]
+    },
+    {
+      "scoreboard_tag": "6",
+      "message": "If only half of Cordryn's Tiezure Activator was on the Vetruvia, then the other half must have sunk into the ocean! It must have been found by the Weepers ages ago--those wretched beasts, fueled by the magic of the Arcane, they'll be nearly unstoppable! You need to dive down to the bottom of the ocean and retrieve the other half. If anyone could do it, it'd be you, warrior. You have my word.",
+      "choices": [
+        {
+          "text": "Let's do this.",
+          "direct": "7"
+        },
+        {
+          "text": "I'm not so sure...",
+          "direct": "8"
+        }
+      ]
+    },
+    {
+      "scoreboard_tag": "7",
+      "message": "You'll be taking that Arcane portal to get near the site. Remember, once you land on the other side, you're on your own.",
+      "choices": []
+    },
+    {
+      "scoreboard_tag": "8",
+      "message": "That's alright, warrior. Better days await us all. Do visit soon!",
+      "choices": []
+    }
+  ]
+}
