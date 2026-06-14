@@ -2,7 +2,7 @@
   "name": "mc-converter-dev",
   "private": true,
   "scripts": {
-    "dev": "concurrently --names api,ui --prefix-colors cyan,magenta \"uvicorn web.backend.server:app --reload\" \"npm run dev --prefix web/frontend\"",
+    "dev": "concurrently --names api,ui --prefix-colors cyan,magenta \"python -m uvicorn web.backend.server:app --reload --reload-dir web/backend --port 8000\" \"npm run dev --prefix web/frontend\"",
     "build": "npm install --prefix web/frontend && npm run build --prefix web/frontend"
   },
   "devDependencies": {

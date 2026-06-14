@@ -1,10 +1,15 @@
 // Shared Minecraft helpers: color constants, the color picker, text-format
 // toggles, the item slot + in-game-style tooltip, give-payload building, and
 // the Item Library API client. Used by both ItemLibrary and NpcMaker.
-import { useState, useRef, useEffect } from 'react'
-import { ChevronDown, Check, Hash, Bold, Italic, Underline, Strikethrough, Sparkles } from 'lucide-react'
+import { useState, useRef, useEffect, useLayoutEffect, useCallback } from 'react'
+import { ChevronDown, Check, Hash, Bold, Italic, Underline, Strikethrough, Shuffle, Type } from 'lucide-react'
 
 export const API_BASE = ''
+
+// In-game tooltips render up-and-to-the-right of the cursor. These are the
+// offsets (px) from the mouse pointer to the tooltip's top-left corner.
+export const TOOLTIP_OFFSET_X = 14 // → to the right of the cursor
+export const TOOLTIP_OFFSET_Y = 26 // ↑ above the cursor
 
 // Standard Minecraft named text colors → hex. Order matches the in-game list.
 export const MC_COLOR_LIST = [
@@ -27,8 +32,10 @@ export function resolveColor(c) {
 // The five vanilla text-format flags, keyed by their Minecraft component name.
 export const FORMAT_FLAGS = [
   ['bold', Bold], ['italic', Italic], ['underlined', Underline],
-  ['strikethrough', Strikethrough], ['obfuscated', Sparkles],
+  ['strikethrough', Strikethrough], ['obfuscated', Shuffle],
 ]
+// Just the flag keys, in order — used by the segment/rich-text machinery.
+const FMT_KEYS = FORMAT_FLAGS.map(([k]) => k)
 
 // ---------------------------------------------------------------------------
 // Color picker — lists the 16 Minecraft colors plus an MCStacker-style hex
@@ -166,15 +173,72 @@ export function FormatToggles({ fmt, onChange }) {
 }
 
 // ---------------------------------------------------------------------------
-// Preview rendering of a formatted-text object.
+// Segment model
+//
+// A run of styled text is a "segment": { text, color?, bold?, … }. A "line" is
+// an array of segments. The name is one line; lore is an array of lines. This
+// is the in-memory shape the rich-text editor produces and the tooltip renders.
 // ---------------------------------------------------------------------------
-function formatStyle(ft) {
-  const deco = [ft.underlined && 'underline', ft.strikethrough && 'line-through']
+
+// The format-only part of a segment (no text), with empty/false keys dropped.
+function segFmt(s) {
+  const f = {}
+  if (s.color) f.color = s.color
+  for (const k of FMT_KEYS) if (s[k]) f[k] = true
+  return f
+}
+function sameFmt(a, b) {
+  if ((a.color || '') !== (b.color || '')) return false
+  for (const k of FMT_KEYS) if (!!a[k] !== !!b[k]) return false
+  return true
+}
+// Append text to a segment list, merging into the last run if the format matches.
+function pushRun(segs, text, fmt) {
+  if (!text) return
+  const last = segs[segs.length - 1]
+  if (last && sameFmt(last, fmt)) last.text += text
+  else segs.push({ ...fmt, text })
+}
+
+// Normalize anything (Minecraft text component, plain string, segment array,
+// legacy {text,…} object) into a flat array of segments. `extra` children
+// inherit the parent's format, matching the game.
+export function asSegments(value, inherited = {}) {
+  if (value == null) return []
+  if (typeof value === 'string') return value ? [{ ...inherited, text: value }] : []
+  if (Array.isArray(value)) return value.flatMap((v) => asSegments(v, inherited))
+  const fmt = { ...inherited }
+  if (value.color != null) fmt.color = value.color
+  for (const k of FMT_KEYS) if (value[k] != null) fmt[k] = value[k]
+  const out = []
+  if (value.text) out.push({ ...segFmt(fmt), text: value.text })
+  if (Array.isArray(value.extra)) for (const e of value.extra) out.push(...asSegments(e, fmt))
+  return out
+}
+
+// Plain text of any formatted value.
+export const plainText = (value) => asSegments(value).map((s) => s.text).join('')
+
+// A line (segment array) → a Minecraft text component. One segment collapses to
+// a flat component; many become a base with an `extra` array.
+export function lineToComponent(line) {
+  const segs = asSegments(line).filter((s) => s.text)
+  const comp = (s) => ({ text: s.text, ...segFmt(s) })
+  if (!segs.length) return { text: '' }
+  if (segs.length === 1) return comp(segs[0])
+  return { text: '', extra: segs.map(comp) }
+}
+
+// ---------------------------------------------------------------------------
+// Preview rendering
+// ---------------------------------------------------------------------------
+function segStyle(s) {
+  const deco = [s.underlined && 'underline', s.strikethrough && 'line-through']
     .filter(Boolean).join(' ')
   return {
-    color: resolveColor(ft.color) || undefined,
-    fontWeight: ft.bold ? 700 : undefined,
-    fontStyle: ft.italic ? 'italic' : undefined,
+    color: resolveColor(s.color) || undefined,
+    fontWeight: s.bold ? 700 : undefined,
+    fontStyle: s.italic ? 'italic' : undefined,
     textDecoration: deco || undefined,
   }
 }
@@ -184,48 +248,64 @@ function scramble(text) {
   return text.replace(/\S/g, () => OBF_CHARS[Math.floor(Math.random() * OBF_CHARS.length)])
 }
 
-// Renders one formatted-text line, animating obfuscated text like the game.
-export function FormattedText({ ft, fallback = '' }) {
-  const text = ft?.text ?? ''
-  const [shown, setShown] = useState(text)
+// One obfuscated segment, scrambling its glyphs on a timer like the game does.
+function ObfuscatedRun({ s }) {
+  const [shown, setShown] = useState(() => scramble(s.text))
   useEffect(() => {
-    if (!ft?.obfuscated) { setShown(text); return }
-    setShown(scramble(text))
-    const id = setInterval(() => setShown(scramble(text)), 70)
+    setShown(scramble(s.text))
+    const id = setInterval(() => setShown(scramble(s.text)), 70)
     return () => clearInterval(id)
-  }, [text, ft?.obfuscated])
-  if (!text) return <span className="opacity-40">{fallback}</span>
-  return <span style={formatStyle(ft)}>{ft?.obfuscated ? shown : text}</span>
+  }, [s.text])
+  return <span style={segStyle(s)}>{shown}</span>
 }
 
-// In-game-style hover tooltip: dark box with the (formatted) name on top and
-// formatted lore lines below.
+// Renders a line (array of segments / any formatted value) as styled spans.
+export function FormattedLine({ value, fallback = '' }) {
+  const segs = asSegments(value).filter((s) => s.text)
+  if (!segs.length) return <span className="opacity-40">{fallback}</span>
+  return segs.map((s, i) => (s.obfuscated
+    ? <ObfuscatedRun key={i} s={s} />
+    : <span key={i} style={segStyle(s)}>{s.text}</span>))
+}
+
+// In-game-style tooltip: dark box, formatted name on top, lore lines below.
 export function ItemTooltip({ name, lore }) {
   return (
     <div
       className="pointer-events-none whitespace-nowrap px-2 py-1.5 text-sm leading-tight border-2"
       style={{ background: '#100010F0', borderColor: '#280050', fontFamily: 'inherit' }}
     >
-      <div style={{ color: '#FFFFFF' }}><FormattedText ft={name} fallback="Unnamed item" /></div>
+      <div style={{ color: '#FFFFFF' }}><FormattedLine value={name} fallback="Unnamed item" /></div>
       {(lore || []).map((line, i) => (
         <div key={i} style={{ color: resolveColor('gray') }}>
-          <FormattedText ft={line} fallback=" " />
+          <FormattedLine value={line} fallback=" " />
         </div>
       ))}
     </div>
   )
 }
 
-// A mock inventory slot showing a texture, with a hovercard tooltip. Optional
-// drag support and overlay actions (e.g. a remove button).
+// A mock inventory slot showing a texture. Falls back from the custom texture
+// to the vanilla base-item texture (items inheriting the base game look), then
+// hides if neither resolves. The tooltip follows the mouse, anchored
+// up-and-to-the-right of the cursor (TOOLTIP_OFFSET_*). `hoverActions` is an
+// overlay rendered only while hovering; `children` renders always.
 export function ItemSlot({
-  texture, name, lore, size = 48, draggable = false, onDragStart, title, children,
+  texture, fallbackTexture, name, lore, size = 48,
+  draggable = false, onDragStart, title, children, hoverActions,
 }) {
   const [hover, setHover] = useState(false)
+  const [pos, setPos] = useState({ x: 0, y: 0 })
+  const [primaryFailed, setPrimaryFailed] = useState(false)
+  useEffect(() => setPrimaryFailed(false), [texture])
+
+  const src = texture && !primaryFailed ? texture : (fallbackTexture || null)
+  const hasContent = plainText(name).length > 0 || (lore || []).some((l) => plainText(l).length > 0)
   return (
     <div
       className="relative shrink-0"
-      onMouseEnter={() => setHover(true)}
+      onMouseEnter={(e) => { setHover(true); setPos({ x: e.clientX, y: e.clientY }) }}
+      onMouseMove={(e) => setPos({ x: e.clientX, y: e.clientY })}
       onMouseLeave={() => setHover(false)}
     >
       <div
@@ -235,19 +315,27 @@ export function ItemSlot({
         className="flex items-center justify-center border-2 border-zinc-400 dark:border-zinc-600 bg-zinc-300/70 dark:bg-zinc-700/70"
         style={{ width: size, height: size, cursor: draggable ? 'grab' : 'default' }}
       >
-        {texture ? (
+        {src ? (
           <img
-            src={texture}
-            alt={name?.text || ''}
+            key={src}
+            src={src}
+            alt={plainText(name)}
             draggable={false}
             style={{ width: size - 10, height: size - 10, imageRendering: 'pixelated' }}
-            onError={(e) => { e.currentTarget.style.visibility = 'hidden' }}
+            onError={(e) => {
+              if (texture && !primaryFailed) setPrimaryFailed(true)
+              else e.currentTarget.style.visibility = 'hidden'
+            }}
           />
         ) : null}
       </div>
       {children}
-      {hover && (name?.text || (lore && lore.length)) && (
-        <div className="absolute left-1/2 -translate-x-1/2 bottom-full mb-1 z-50">
+      {hover && hoverActions}
+      {hover && hasContent && (
+        <div
+          className="fixed z-50"
+          style={{ left: pos.x + TOOLTIP_OFFSET_X, top: pos.y - TOOLTIP_OFFSET_Y }}
+        >
           <ItemTooltip name={name} lore={lore} />
         </div>
       )}
@@ -259,42 +347,369 @@ export function ItemSlot({
 // Data helpers
 // ---------------------------------------------------------------------------
 
-// A blank formatted-text object.
+// A blank formatted-text object (legacy single-run shape; kept for callers that
+// still want one styled run).
 export const blankFmt = (text = '') => ({
   text, color: '', bold: false, italic: false,
   underlined: false, strikethrough: false, obfuscated: false,
 })
 
-// Formatted-text object → Minecraft text-component JSON (only set keys).
-export function textComponent(ft) {
-  const c = { text: ft.text || '' }
-  if (ft.color) c.color = ft.color
-  for (const [flag] of FORMAT_FLAGS) if (ft[flag]) c[flag] = true
-  return c
-}
-
 // Texture URL for a custom model stem.
 export const textureUrl = (stem) => `${API_BASE}/api/textures/custom/${stem}.png`
+// Vanilla base-item texture, used when an item inherits the base game look.
+export const baseTextureUrl = (baseItem) =>
+  baseItem ? `${API_BASE}/api/base-textures/${String(baseItem).replace(/^minecraft:/, '')}.png` : null
 
-// Saved item manifest → the give-payload the NPC builder expects:
-// { base_item, count, components:{ item_model, custom_name?, lore?, custom_data? } }.
+// ---------------------------------------------------------------------------
+// Item manifest helpers
+//
+// A saved item row is { id, manifest, created_at }. The manifest is the full
+// give-payload — { base_item, count, components:{...} } — so arbitrary
+// components (enchantments, attribute modifiers, …) round-trip untouched even
+// though the editor only surfaces name / lore / tags.
+// ---------------------------------------------------------------------------
+export const EDITABLE_COMPONENTS = [
+  'minecraft:item_model', 'minecraft:custom_name', 'minecraft:lore', 'minecraft:custom_data',
+]
+
+export const manifestComponents = (m) => (m && m.components) || {}
+// Custom-model stem from minecraft:item_model (`minecraft:custom/<stem>`), or null.
+export function manifestStem(m) {
+  const im = manifestComponents(m)['minecraft:item_model']
+  if (typeof im !== 'string') return null
+  const i = im.indexOf('custom/')
+  return i >= 0 ? im.slice(i + 'custom/'.length) : null
+}
+export const manifestName = (m) => manifestComponents(m)['minecraft:custom_name'] || null
+export const manifestLore = (m) => manifestComponents(m)['minecraft:lore'] || []
+export const manifestTags = (m) => Object.keys(manifestComponents(m)['minecraft:custom_data'] || {})
+// Component keys beyond the editable few — the "additional data" the editor locks.
+export const manifestExtraKeys = (m) =>
+  Object.keys(manifestComponents(m)).filter((k) => !EDITABLE_COMPONENTS.includes(k))
+// A human label for an item (its custom name, else its model stem / base item).
+export const manifestLabel = (m) =>
+  plainText(manifestName(m)) || manifestStem(m) || (m && m.base_item) || 'item'
+
+// Custom + vanilla-fallback texture URLs for an item's slot.
+export function manifestTextures(m) {
+  const stem = manifestStem(m)
+  return { texture: stem ? textureUrl(stem) : null, fallbackTexture: baseTextureUrl(m && m.base_item) }
+}
+
+// The give-payload for an item is simply its manifest.
 export function buildGivePayload(item) {
-  const components = {
-    'minecraft:item_model': `minecraft:custom/${item.model_stem}`,
+  return item.manifest || item
+}
+
+// ---------------------------------------------------------------------------
+// Rich-text editor — type freely, highlight a span, and a floating toolbar
+// applies bold / italic / underline / strikethrough / obfuscated / color to
+// just that selection. The value is an array of lines (each a segment array);
+// `singleLine` keeps Enter from creating new lines (used for the item name).
+// ---------------------------------------------------------------------------
+
+// Explode a line into per-character {ch, fmt} so a range can be re-styled, then
+// rejoin equal-format neighbours back into segments.
+function lineToChars(line) {
+  const out = []
+  for (const s of asSegments(line)) for (const ch of s.text) out.push({ ch, fmt: segFmt(s) })
+  return out
+}
+function charsToLine(chars) {
+  const segs = []
+  for (const { ch, fmt } of chars) pushRun(segs, ch, fmt)
+  return segs
+}
+
+const escapeHtml = (s) => s.replace(/[&<>]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c]))
+
+// lines → HTML. One <div> per line; one <span data-fmt> per segment.
+function linesToHtml(lines) {
+  const list = lines.length ? lines : [[]]
+  return list.map((line) => {
+    const segs = asSegments(line).filter((s) => s.text)
+    if (!segs.length) return '<div><br></div>'
+    const inner = segs.map((s) => {
+      const fmt = segFmt(s)
+      const style = Object.entries(segStyle(s))
+        .filter(([, v]) => v != null)
+        .map(([k, v]) => `${k.replace(/[A-Z]/g, (m) => '-' + m.toLowerCase())}:${v}`)
+        .join(';')
+      return `<span data-fmt='${escapeHtml(JSON.stringify(fmt))}' style="${style}">${escapeHtml(s.text)}</span>`
+    }).join('')
+    return `<div>${inner}</div>`
+  }).join('')
+}
+
+// Format carried by an element: an explicit data-fmt wins; otherwise infer from
+// tags the browser may inject (b/i/u/s) merged with the inherited format.
+function fmtFromEl(el, inherited) {
+  if (el.dataset && el.dataset.fmt) {
+    try { return JSON.parse(el.dataset.fmt) } catch { /* fall through */ }
   }
-  if (item.custom_name?.text) components['minecraft:custom_name'] = textComponent(item.custom_name)
-  const lore = (item.lore || []).filter((l) => l.text)
-  if (lore.length) components['minecraft:lore'] = lore.map(textComponent)
-  if (item.custom_data && Object.keys(item.custom_data).length) {
-    components['minecraft:custom_data'] = item.custom_data
+  const f = { ...inherited }
+  const tag = el.tagName
+  if (tag === 'B' || tag === 'STRONG') f.bold = true
+  if (tag === 'I' || tag === 'EM') f.italic = true
+  if (tag === 'U') f.underlined = true
+  if (tag === 'S' || tag === 'STRIKE' || tag === 'DEL') f.strikethrough = true
+  return f
+}
+
+// Parse a single inline node (text or element) into segments.
+function parseInline(node, fmt, out) {
+  if (node.nodeType === 3) { pushRun(out, node.nodeValue, fmt); return }
+  if (node.nodeType !== 1 || node.tagName === 'BR') return
+  const nf = fmtFromEl(node, fmt)
+  for (const c of node.childNodes) parseInline(c, nf, out)
+}
+
+// contentEditable DOM → lines. Each top-level <div>/<p> (or <br>) is a line.
+function domToLines(root) {
+  const lines = []
+  let pending = null
+  const flush = () => { if (pending !== null) { lines.push(pending); pending = null } }
+  for (const child of root.childNodes) {
+    if (child.nodeType === 1 && (child.tagName === 'DIV' || child.tagName === 'P')) {
+      flush()
+      const segs = []
+      for (const c of child.childNodes) parseInline(c, {}, segs)
+      lines.push(segs)
+    } else if (child.nodeType === 1 && child.tagName === 'BR') {
+      if (pending === null) pending = []
+      flush()
+    } else {
+      if (pending === null) pending = []
+      parseInline(child, {}, pending)
+    }
   }
-  return { base_item: item.base_item, count: item.count || 1, components }
+  flush()
+  return lines.length ? lines : [[]]
+}
+
+// --- selection <-> {line, char} offsets ----------------------------------
+function lineIndexOf(root, node) {
+  if (node === root) return -1
+  let el = node.nodeType === 3 ? node.parentNode : node
+  while (el && el.parentNode !== root) el = el.parentNode
+  if (!el) return -1
+  return Array.prototype.indexOf.call(root.children, el)
+}
+function charOffsetIn(container, node, offset) {
+  const r = document.createRange()
+  r.selectNodeContents(container)
+  try { r.setEnd(node, offset) } catch { return container.textContent.length }
+  return r.toString().length
+}
+function readSelection(root) {
+  const sel = window.getSelection()
+  if (!sel || !sel.rangeCount) return null
+  const r = sel.getRangeAt(0)
+  if (r.collapsed || !root.contains(r.startContainer) || !root.contains(r.endContainer)) return null
+  let sLine = lineIndexOf(root, r.startContainer)
+  let eLine = lineIndexOf(root, r.endContainer)
+  if (sLine < 0 || eLine < 0) return null
+  const sCh = charOffsetIn(root.children[sLine], r.startContainer, r.startOffset)
+  const eCh = charOffsetIn(root.children[eLine], r.endContainer, r.endOffset)
+  return { startLine: sLine, startCh: sCh, endLine: eLine, endCh: eCh }
+}
+function locateChar(lineEl, ch) {
+  let remaining = ch
+  const walker = document.createTreeWalker(lineEl, NodeFilter.SHOW_TEXT)
+  let n, last = null
+  while ((n = walker.nextNode())) {
+    last = n
+    if (remaining <= n.nodeValue.length) return { node: n, offset: remaining }
+    remaining -= n.nodeValue.length
+  }
+  if (last) return { node: last, offset: last.nodeValue.length }
+  return { node: lineEl, offset: 0 }
+}
+function restoreSelection(root, range) {
+  if (!range || !root.children[range.startLine] || !root.children[range.endLine]) return
+  const a = locateChar(root.children[range.startLine], range.startCh)
+  const b = locateChar(root.children[range.endLine], range.endCh)
+  const r = document.createRange()
+  r.setStart(a.node, a.offset)
+  r.setEnd(b.node, b.offset)
+  const sel = window.getSelection()
+  sel.removeAllRanges()
+  sel.addRange(r)
+}
+
+// The floating format toolbar shown over an active selection.
+const TOOLBAR_COLORS = MC_COLOR_LIST
+
+function RichToolbar({ pos, active, onToggle, onColor }) {
+  return (
+    <div
+      className="fixed z-[60] flex items-center gap-0.5 p-1 bg-zinc-900 border border-zinc-700 rounded-lg shadow-2xl"
+      style={{ left: pos.left, top: pos.top, transform: 'translate(-50%, -100%)' }}
+      onMouseDown={(e) => e.preventDefault()} /* keep the text selection alive */
+    >
+      {FORMAT_FLAGS.map(([flag, Icon]) => (
+        <button
+          key={flag}
+          type="button"
+          title={flag}
+          onClick={() => onToggle(flag)}
+          className={`p-1.5 rounded-md transition-colors ${
+            active[flag] ? 'bg-zinc-100 text-zinc-900' : 'text-zinc-300 hover:bg-zinc-700'
+          }`}
+        >
+          <Icon size={14} />
+        </button>
+      ))}
+      <div className="w-px h-5 bg-zinc-700 mx-0.5" />
+      {TOOLBAR_COLORS.map(([name, hex]) => (
+        <button
+          key={name}
+          type="button"
+          title={name}
+          onClick={() => onColor(name)}
+          className={`w-4 h-4 rounded-sm border ${active.color === name ? 'border-white' : 'border-white/20'}`}
+          style={{ backgroundColor: hex }}
+        />
+      ))}
+      <button
+        type="button"
+        title="default color"
+        onClick={() => onColor('')}
+        className="p-1 rounded-md text-zinc-300 hover:bg-zinc-700"
+      >
+        <Type size={13} />
+      </button>
+    </div>
+  )
+}
+
+export function RichTextEditor({ value, onChange, singleLine = false, placeholder = '' }) {
+  const ref = useRef(null)
+  const lastEmitted = useRef(null)
+  const [toolbar, setToolbar] = useState(null)
+  const lines = value && value.length ? value : [[]]
+  const isEmpty = !lines.some((l) => asSegments(l).some((s) => s.text))
+
+  const emit = useCallback((next) => { lastEmitted.current = next; onChange(next) }, [onChange])
+
+  // Sync DOM from value only on external changes (load/reset) — never while the
+  // user types, so the caret stays put.
+  useLayoutEffect(() => {
+    if (value === lastEmitted.current) return
+    if (ref.current) ref.current.innerHTML = linesToHtml(lines)
+  }, [value]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  const refreshToolbar = useCallback(() => {
+    const root = ref.current
+    if (!root) return
+    const range = readSelection(root)
+    if (!range) { setToolbar(null); return }
+    const domRange = window.getSelection().getRangeAt(0)
+    const rect = domRange.getBoundingClientRect()
+    // Active state = format shared by every selected character.
+    const cur = domToLines(root)
+    let active = null
+    for (let li = range.startLine; li <= range.endLine; li++) {
+      const chars = lineToChars(cur[li] || [])
+      const from = li === range.startLine ? range.startCh : 0
+      const to = li === range.endLine ? range.endCh : chars.length
+      for (let i = from; i < to; i++) {
+        const f = chars[i].fmt
+        if (active === null) active = { ...f }
+        else {
+          for (const k of FMT_KEYS) if (!f[k]) delete active[k]
+          if ((f.color || '') !== (active.color || '')) active.color = undefined
+        }
+      }
+    }
+    setToolbar({ left: rect.left + rect.width / 2, top: rect.top - 6, active: active || {} })
+  }, [])
+
+  useEffect(() => {
+    const onSel = () => refreshToolbar()
+    document.addEventListener('selectionchange', onSel)
+    return () => document.removeEventListener('selectionchange', onSel)
+  }, [refreshToolbar])
+
+  const onInput = () => { if (ref.current) emit(domToLines(ref.current)) }
+
+  // Apply a transform to every character in the live selection, then re-render
+  // the DOM and restore the selection so further edits stack.
+  const applyToSelection = (transform) => {
+    const root = ref.current
+    if (!root) return
+    const range = readSelection(root)
+    if (!range) return
+    const cur = domToLines(root)
+    const next = cur.map((line, li) => {
+      if (li < range.startLine || li > range.endLine) return line
+      const chars = lineToChars(line)
+      const from = li === range.startLine ? range.startCh : 0
+      const to = li === range.endLine ? range.endCh : chars.length
+      for (let i = from; i < to; i++) chars[i].fmt = transform(chars[i].fmt)
+      return charsToLine(chars)
+    })
+    root.innerHTML = linesToHtml(next)
+    restoreSelection(root, range)
+    emit(next)
+    refreshToolbar()
+  }
+
+  const toggleFlag = (flag) => {
+    const willEnable = !toolbar?.active?.[flag]
+    applyToSelection((fmt) => {
+      const f = { ...fmt }
+      if (willEnable) f[flag] = true
+      else delete f[flag]
+      return f
+    })
+  }
+  const setColor = (color) => applyToSelection((fmt) => {
+    const f = { ...fmt }
+    if (color) f.color = color
+    else delete f.color
+    return f
+  })
+
+  const onKeyDown = (e) => {
+    if (singleLine && e.key === 'Enter') { e.preventDefault(); return }
+    // Route the browser's native bold/italic/underline shortcuts to our model.
+    if ((e.ctrlKey || e.metaKey) && !e.altKey) {
+      const k = e.key.toLowerCase()
+      const map = { b: 'bold', i: 'italic', u: 'underlined' }
+      if (map[k]) { e.preventDefault(); toggleFlag(map[k]) }
+    }
+  }
+
+  return (
+    <div className="relative">
+      <div
+        ref={ref}
+        contentEditable
+        suppressContentEditableWarning
+        spellCheck={false}
+        onInput={onInput}
+        onKeyDown={onKeyDown}
+        onBlur={() => setToolbar(null)}
+        style={{ background: '#100010', color: '#FFFFFF' }}
+        className="w-full min-h-[2.25rem] px-3 py-1.5 text-sm rounded-lg border-2 border-[#280050] focus:outline-none focus:ring-2 focus:ring-zinc-500 whitespace-pre-wrap break-words"
+      />
+      {isEmpty && (
+        <span className="pointer-events-none absolute left-[16px] top-2.5 text-sm text-zinc-400 select-none">
+          {placeholder}
+        </span>
+      )}
+      {toolbar && (
+        <RichToolbar pos={toolbar} active={toolbar.active} onToggle={toggleFlag} onColor={setColor} />
+      )}
+    </div>
+  )
 }
 
 // ---------------------------------------------------------------------------
 // Item Library API client
 // ---------------------------------------------------------------------------
-async function jsonOrThrow(res) {
+export async function jsonOrThrow(res) {
   const data = await res.json().catch(() => ({}))
   if (!res.ok) throw new Error(data.detail || `Request failed (${res.status})`)
   return data
@@ -306,19 +721,37 @@ export const fetchModels = () =>
 export const fetchItems = () =>
   fetch(`${API_BASE}/api/items`).then(jsonOrThrow).then((d) => d.items)
 
-export const createItem = (item) =>
+export const createItem = (manifest) =>
   fetch(`${API_BASE}/api/items`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(item),
+    body: JSON.stringify({ manifest }),
   }).then(jsonOrThrow).then((d) => d.item)
 
-export const updateItem = (id, item) =>
+export const updateItem = (id, manifest) =>
   fetch(`${API_BASE}/api/items/${id}`, {
     method: 'PUT',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(item),
+    body: JSON.stringify({ manifest }),
   }).then(jsonOrThrow).then((d) => d.item)
 
 export const deleteItem = (id) =>
   fetch(`${API_BASE}/api/items/${id}`, { method: 'DELETE' }).then(jsonOrThrow)
+
+// Import items from a /give command (text) and/or a .schem file. Returns the
+// list of newly-saved rows.
+export const importItems = ({ text, file }) => {
+  const body = new FormData()
+  if (text) body.append('text', text)
+  if (file) body.append('file', file)
+  return fetch(`${API_BASE}/api/items/import`, { method: 'POST', body })
+    .then(jsonOrThrow).then((d) => d.items)
+}
+
+// Render a manifest as a copy-pasteable /give command.
+export const giveCommand = (manifest) =>
+  fetch(`${API_BASE}/api/items/give-command`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ manifest }),
+  }).then(jsonOrThrow).then((d) => d.command)

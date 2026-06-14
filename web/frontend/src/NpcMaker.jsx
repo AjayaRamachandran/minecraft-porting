@@ -1,9 +1,10 @@
 import { useState, useMemo, useRef, useEffect } from 'react'
 import {
-  Plus, Trash2, Crosshair, Download, Copy, Upload, X, MessageSquare, ChevronRight, Package,
+  Plus, Trash2, Crosshair, Download, Copy, Upload, X, MessageSquare, ChevronRight, Package, Search,
 } from 'lucide-react'
 import {
-  API_BASE, ColorPicker, resolveColor, ItemSlot, textureUrl, buildGivePayload, fetchItems,
+  API_BASE, ColorPicker, resolveColor, ItemSlot, textureUrl, buildGivePayload, fetchItems, jsonOrThrow,
+  manifestStem, manifestName, manifestLore, manifestLabel, manifestTextures,
 } from './mc'
 
 let _uid = 0
@@ -15,13 +16,13 @@ const uid = () => `n${++_uid}`
 // stripped on export.
 function choiceItemFromManifest(item) {
   const payload = buildGivePayload(item)
-  return { ...payload, _stem: item.model_stem, _label: item.custom_name?.text || item.name || item.model_stem }
+  return { ...payload, _stem: manifestStem(item.manifest), _label: manifestLabel(item.manifest) }
 }
 
 function choiceItemFromJson(it) {
   const comps = it.components || {}
   const stem = String(comps['minecraft:item_model'] || '').replace(/^minecraft:custom\//, '')
-  const label = comps['minecraft:custom_name']?.text || stem || it.base_item || 'item'
+  const label = plainText(comps['minecraft:custom_name']) || stem || it.base_item || 'item'
   return { base_item: it.base_item, count: it.count || 1, components: comps, _stem: stem, _label: label }
 }
 
@@ -78,7 +79,7 @@ function toJson(state) {
 }
 
 const blankState = () => ({
-  npc_variable_initial: 'npc',
+  npc_variable_initial: '',
   npc_name: '',
   name_color: 'gold',
   conversations: [
@@ -99,6 +100,7 @@ export default function NpcMaker() {
   const fileRef = useRef(null)
   // Saved custom items shown in the inventory strip, draggable onto choices.
   const [library, setLibrary] = useState([])
+  const [libQuery, setLibQuery] = useState('')
   const [dragOverChoice, setDragOverChoice] = useState(null)
 
   useEffect(() => {
@@ -120,6 +122,14 @@ export default function NpcMaker() {
     [state.conversations],
   )
   const swatch = resolveColor(state.name_color)
+
+  const filteredLibrary = useMemo(() => {
+    const q = libQuery.trim().toLowerCase()
+    if (!q) return library
+    return library.filter((it) =>
+      manifestLabel(it.manifest).toLowerCase().includes(q) ||
+      (it.manifest.base_item || '').toLowerCase().includes(q))
+  }, [library, libQuery])
 
   // --- state mutation helpers -------------------------------------------
   const setField = (k, v) => setState((s) => ({ ...s, [k]: v }))
@@ -247,8 +257,7 @@ export default function NpcMaker() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(toJson(state)),
       })
-      const data = await res.json()
-      if (!res.ok) throw new Error(data.detail || 'Generation failed')
+      const data = await jsonOrThrow(res)
       const bytes = atob(data.schem_base64)
       const arr = new Uint8Array(bytes.length)
       for (let i = 0; i < bytes.length; i++) arr[i] = bytes.charCodeAt(i)
@@ -274,7 +283,9 @@ export default function NpcMaker() {
   // ----------------------------------------------------------------------
   return (
     <>
-    <div className="max-w-3xl mx-auto px-6 py-8 pb-28 space-y-5">
+    {/* Reserve room on the right for the fixed Item Library panel. */}
+    <div className="lg:pr-64">
+    <div className="max-w-3xl mx-auto px-6 py-8 space-y-5">
       <div className="flex items-start justify-between gap-4">
         <div>
           <h2 className="text-5xl leading-none">NPC Maker</h2>
@@ -594,35 +605,50 @@ export default function NpcMaker() {
       )}
     </div>
 
-    {/* Item Library inventory strip — drag an item onto any choice to give it. */}
-    <div className="fixed bottom-0 left-52 right-0 z-30 border-t border-zinc-200 dark:border-zinc-800 bg-white/95 dark:bg-zinc-950/95 backdrop-blur px-4 py-2">
-      <div className="flex items-center gap-3">
-        <span className="flex items-center gap-1.5 text-xs font-medium text-zinc-500 dark:text-zinc-400 shrink-0">
-          <Package size={14} /> Item Library
-        </span>
-        <div className="flex items-center gap-1.5 overflow-x-auto py-1">
-          {library.length === 0 ? (
-            <span className="text-xs text-zinc-400">No saved items — create some in the Item Library tab.</span>
-          ) : (
-            library.map((item) => (
+    </div>
+
+    {/* Item Library — fixed right panel; drag an item onto any choice to give it. */}
+    <aside className="hidden lg:flex fixed top-0 right-0 h-screen z-30 flex-col border-l border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-950 px-3 py-4">
+      <span className="flex items-center gap-1.5 text-xs font-medium text-zinc-500 dark:text-zinc-400 mb-2">
+        <Package size={14} /> Item Library <span className="text-zinc-400 font-normal">({library.length})</span>
+      </span>
+      <div className="relative mb-2">
+        <Search size={13} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-zinc-400" />
+        <input
+          value={libQuery}
+          onChange={(e) => setLibQuery(e.target.value)}
+          placeholder="Search items…"
+          className="w-full pl-7 pr-2 py-1 text-xs rounded-lg border border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-900 focus:outline-none focus:ring-2 focus:ring-zinc-300 dark:focus:ring-zinc-600"
+        />
+      </div>
+      {library.length === 0 ? (
+        <p className="text-xs text-zinc-400 py-2">No saved items — create some in the Item Library tab.</p>
+      ) : filteredLibrary.length === 0 ? (
+        <p className="text-xs text-zinc-400 py-2">No items match “{libQuery}”.</p>
+      ) : (
+        <div className="grid grid-cols-5 gap-1.5 flex-1 min-h-0 overflow-y-auto pr-1 -mr-1 content-start">
+          {filteredLibrary.map((item) => {
+            const { texture, fallbackTexture } = manifestTextures(item.manifest)
+            return (
               <ItemSlot
                 key={item.id}
-                texture={textureUrl(item.model_stem)}
-                name={item.custom_name}
-                lore={item.lore}
+                texture={texture}
+                fallbackTexture={fallbackTexture}
+                name={manifestName(item.manifest)}
+                lore={manifestLore(item.manifest)}
                 size={40}
                 draggable
-                title={`Drag “${item.name}” onto a choice`}
+                title={`Drag “${manifestLabel(item.manifest)}” onto a choice`}
                 onDragStart={(e) => {
                   e.dataTransfer.setData('application/x-mc-item', JSON.stringify(item))
                   e.dataTransfer.effectAllowed = 'copy'
                 }}
               />
-            ))
-          )}
+            )
+          })}
         </div>
-      </div>
-    </div>
+      )}
+    </aside>
     </>
   )
 }

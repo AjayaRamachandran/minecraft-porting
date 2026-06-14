@@ -2,12 +2,35 @@
 @tailwind components;
 @tailwind utilities;
 
-/* Body font — Mac's Minecraft (served from /public). */
+/* Body font — Mac's Minecraft (served from /public/font_files). All four real
+   variants are registered so bold/italic use the actual glyph files rather than
+   the browser synthesizing them. */
 @font-face {
   font-family: 'Minecraft';
-  src: url('/macs-Minecraft.otf') format('opentype');
+  src: url("/font_files/mac%27s%20Minecraft.ttf") format('truetype');
   font-weight: normal;
   font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'Minecraft';
+  src: url("/font_files/mac%27s%20Minecraft%20Bold.ttf") format('truetype');
+  font-weight: bold;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'Minecraft';
+  src: url("/font_files/mac%27s%20Minecraft%20Italic.ttf") format('truetype');
+  font-weight: normal;
+  font-style: italic;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'Minecraft';
+  src: url("/font_files/mac%27s%20Minecraft%20Bold%20Italic.ttf") format('truetype');
+  font-weight: bold;
+  font-style: italic;
   font-display: swap;
 }
 
@@ -21,17 +44,15 @@
     font-size: 81.25%; /* 13px base */
   }
   body {
-    letter-spacing: 0.04em;
-  }
-  /* Code/JSON reads better tight and unscaled-spacing. */
-  .font-mono {
-    letter-spacing: 0;
+    /* letter-spacing: 0.03em; */
+    /* Never synthesize bold/italic — use the real Minecraft variant files. */
+    font-synthesis: none;
   }
 
   /* Placeholders always use the pixel body font, even inside mono inputs. */
   ::placeholder {
     font-family: 'Minecraft', ui-sans-serif, system-ui, sans-serif !important;
-    letter-spacing: 0.04em;
+    /* letter-spacing: 0.03em; */
   }
 
   /* Headings use Jacquard 12 (loaded via Google Fonts in index.html) and are

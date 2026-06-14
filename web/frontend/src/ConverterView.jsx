@@ -1,5 +1,6 @@
 import { useState, useRef, useCallback } from 'react'
 import { CopyIcon, DownloadIcon, FileIcon } from './icons'
+import { jsonOrThrow } from './mc'
 
 const API_BASE = ''
 
@@ -49,8 +50,7 @@ export default function ConverterView() {
 
     try {
       const res = await fetch(`${API_BASE}/api/convert`, { method: 'POST', body })
-      const data = await res.json()
-      if (!res.ok) throw new Error(data.detail || 'Conversion failed')
+      const data = await jsonOrThrow(res)
       setResult(data)
       setStatus('done')
     } catch (err) {
