@@ -104,7 +104,7 @@ def _norm_item(it: dict) -> dict:
 
 
 def _give_command(item: dict) -> str:
-    """Render a single ``give @s minecraft:<base>[<components>] <count>`` command.
+    """Render a single ``give @p minecraft:<base>[<components>] <count>`` command.
 
     No leading slash — this is the body after ``... run`` in an /execute. The
     component bracket is produced by the converter's renderer.
@@ -112,7 +112,7 @@ def _give_command(item: dict) -> str:
     ItemConverter, Num, Str = _converter_imports()
     comps = {k: _json_to_snbt(v, Num, Str) for k, v in (item["components"] or {}).items()}
     bracket = ItemConverter.render_components_bracket(comps)
-    return f"give @s minecraft:{item['base_item']}{bracket} {item['count']}"
+    return f"give @p minecraft:{item['base_item']}{bracket} {item['count']}"
 
 
 def normalize(data: dict) -> dict:

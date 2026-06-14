@@ -455,7 +455,7 @@ async def import_items(
 
 @app.post("/api/items/give-command")
 def give_command(payload: dict = Body(...)):
-    """Render a manifest as a copy-pasteable `/give @s …` command."""
+    """Render a manifest as a copy-pasteable `/give @p …` command."""
     try:
         body = npc_builder._give_command(npc_builder._norm_item(_structured_manifest(payload)))
     except Exception as exc:  # noqa: BLE001
