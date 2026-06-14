@@ -42,7 +42,7 @@ function migrate(data) {
     npcName = (convs.find((c) => c.npc_name)?.npc_name) || ''
   }
   return {
-    npc_variable_initial: data.npc_variable_initial || 'npc',
+    npc_variable_initial: data.npc_variable_initial || '',
     npc_name: npcName,
     name_color: nameColor,
     conversations: convs.map((c) => ({
