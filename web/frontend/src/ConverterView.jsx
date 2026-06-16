@@ -89,7 +89,7 @@ export default function ConverterView() {
   return (
     <div className="max-w-3xl mx-auto px-6 py-8 space-y-5">
       <div>
-        <h2 className="text-5xl leading-none">MC Command Converter</h2>
+        <h2 className="text-5xl leading-none">Command Converter</h2>
         <p className="text-sm text-zinc-500 dark:text-zinc-400 mt-2">
           Converts 1.20.1 commands and schematics to 1.21.11 format
         </p>

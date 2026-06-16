@@ -151,23 +151,30 @@ export function ColorPicker({ value, onChange }) {
 // boolean flags (and is mutated immutably via onChange).
 // ---------------------------------------------------------------------------
 export function FormatToggles({ fmt, onChange }) {
+  const cycle = (flag) => {
+    const cur = fmt[flag]
+    const next = cur === undefined ? true : cur === true ? false : undefined
+    const f = { ...fmt }
+    if (next === undefined) delete f[flag]
+    else f[flag] = next
+    onChange(f)
+  }
   return (
     <div className="flex items-center gap-0.5">
-      {FORMAT_FLAGS.map(([flag, Icon]) => (
-        <button
-          key={flag}
-          type="button"
-          title={flag}
-          onClick={() => onChange({ ...fmt, [flag]: !fmt[flag] })}
-          className={`p-1.5 rounded-md transition-colors ${
-            fmt[flag]
-              ? 'bg-zinc-800 text-white dark:bg-zinc-200 dark:text-zinc-900'
-              : 'text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200 hover:bg-zinc-100 dark:hover:bg-zinc-700'
-          }`}
-        >
-          <Icon size={14} />
-        </button>
-      ))}
+      {FORMAT_FLAGS.map(([flag, Icon]) => {
+        const state = fmt[flag]
+        const cls = state === true
+          ? 'bg-green-600 text-white'
+          : state === false
+          ? 'bg-red-600 text-white'
+          : 'text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200 hover:bg-zinc-100 dark:hover:bg-zinc-700'
+        return (
+          <button key={flag} type="button" title={flag} onClick={() => cycle(flag)}
+            className={`p-1.5 rounded-md transition-colors ${cls}`}>
+            <Icon size={14} />
+          </button>
+        )
+      })}
     </div>
   )
 }
@@ -184,12 +191,15 @@ export function FormatToggles({ fmt, onChange }) {
 function segFmt(s) {
   const f = {}
   if (s.color) f.color = s.color
-  for (const k of FMT_KEYS) if (s[k]) f[k] = true
+  for (const k of FMT_KEYS) {
+    if (s[k] === true) f[k] = true
+    else if (s[k] === false) f[k] = false
+  }
   return f
 }
 function sameFmt(a, b) {
   if ((a.color || '') !== (b.color || '')) return false
-  for (const k of FMT_KEYS) if (!!a[k] !== !!b[k]) return false
+  for (const k of FMT_KEYS) if (a[k] !== b[k]) return false
   return true
 }
 // Append text to a segment list, merging into the last run if the format matches.
@@ -232,13 +242,13 @@ export function lineToComponent(line) {
 // ---------------------------------------------------------------------------
 // Preview rendering
 // ---------------------------------------------------------------------------
-function segStyle(s) {
+function segStyle(s, defaultItalic = false) {
   const deco = [s.underlined && 'underline', s.strikethrough && 'line-through']
     .filter(Boolean).join(' ')
   return {
     color: resolveColor(s.color) || undefined,
-    fontWeight: s.bold ? 700 : undefined,
-    fontStyle: s.italic ? 'italic' : undefined,
+    fontWeight: s.bold === true ? 700 : s.bold === false ? 400 : undefined,
+    fontStyle: s.italic === true ? 'italic' : s.italic === false ? 'normal' : (defaultItalic ? 'italic' : undefined),
     textDecoration: deco || undefined,
   }
 }
@@ -249,38 +259,123 @@ function scramble(text) {
 }
 
 // One obfuscated segment, scrambling its glyphs on a timer like the game does.
-function ObfuscatedRun({ s }) {
+function ObfuscatedRun({ s, defaultItalic = false }) {
   const [shown, setShown] = useState(() => scramble(s.text))
   useEffect(() => {
     setShown(scramble(s.text))
     const id = setInterval(() => setShown(scramble(s.text)), 70)
     return () => clearInterval(id)
   }, [s.text])
-  return <span style={segStyle(s)}>{shown}</span>
+  return <span style={segStyle(s, defaultItalic)}>{shown}</span>
 }
 
 // Renders a line (array of segments / any formatted value) as styled spans.
-export function FormattedLine({ value, fallback = '' }) {
+export function FormattedLine({ value, fallback = '', defaultItalic = false }) {
   const segs = asSegments(value).filter((s) => s.text)
   if (!segs.length) return <span className="opacity-40">{fallback}</span>
   return segs.map((s, i) => (s.obfuscated
-    ? <ObfuscatedRun key={i} s={s} />
-    : <span key={i} style={segStyle(s)}>{s.text}</span>))
+    ? <ObfuscatedRun key={i} s={s} defaultItalic={defaultItalic} />
+    : <span key={i} style={segStyle(s, defaultItalic)}>{s.text}</span>))
 }
 
 // In-game-style tooltip: dark box, formatted name on top, lore lines below.
+// Custom names default to cyan/italic; lore defaults to light_purple/italic —
+// matching Minecraft's default rendering for these components.
 export function ItemTooltip({ name, lore }) {
   return (
     <div
       className="pointer-events-none whitespace-nowrap px-2 py-1.5 text-sm leading-tight border-2"
       style={{ background: '#100010F0', borderColor: '#280050', fontFamily: 'inherit' }}
     >
-      <div style={{ color: '#FFFFFF' }}><FormattedLine value={name} fallback="Unnamed item" /></div>
+      <div style={{ color: resolveColor('white') }}>
+        <FormattedLine value={name} fallback="Unnamed item" defaultItalic={true} />
+      </div>
       {(lore || []).map((line, i) => (
-        <div key={i} style={{ color: resolveColor('gray') }}>
-          <FormattedLine value={line} fallback=" " />
+        <div key={i} style={{ color: resolveColor('light_purple') }}>
+          <FormattedLine value={line} fallback=" " defaultItalic={true} />
         </div>
       ))}
+    </div>
+  )
+}
+
+// ---------------------------------------------------------------------------
+// Animated texture renderer
+//
+// Minecraft's animated texture format stacks all frames vertically in a
+// single PNG: a W×W sprite sheet where the image is W px wide and N*W px
+// tall (N frames). Frame count is probed once per src via a hidden Image
+// object so detection is independent of the render phase.
+//
+// Timing behaviour differs by frame count:
+//   N == 2  →  crossfade: two copies of the image are stacked; the top
+//              layer's opacity oscillates 0↔1 via a CSS transition, toggled
+//              by a 1 000 ms setInterval. The CSS transition duration also
+//              equals 1 s, so the two frames continuously blend into each
+//              other with no hard cut.
+//   N  > 2  →  hard-cut: a single image sheet scrolls upward by one frame
+//              height every 250 ms (4 fps ≈ Minecraft's default frame time
+//              of 1 tick at 20 tps).
+//   N == 1  →  plain image, no animation.
+// ---------------------------------------------------------------------------
+export function AnimatedTexture({ src, size, onError, draggable = false }) {
+  const [nFrames, setNFrames] = useState(1)
+  const [frame, setFrame] = useState(0)
+  const [crossActive, setCrossActive] = useState(false)
+
+  // Probe dimensions with a hidden Image so we know the frame count before
+  // the visible <img> elements need to paint. Also resets all animation state
+  // when src changes so a new texture never inherits stale timing.
+  useEffect(() => {
+    setNFrames(1); setFrame(0); setCrossActive(false)
+    if (!src) return
+    const probe = new Image()
+    probe.onload = () => {
+      const n = probe.naturalHeight / probe.naturalWidth
+      if (Number.isInteger(n) && n > 1) setNFrames(n)
+    }
+    probe.src = src
+  }, [src])
+
+  // 2-frame crossfade: toggle the overlay opacity every 1 000 ms. The CSS
+  // transition on the overlay also runs for 1 000 ms, producing a continuous
+  // blend with no stationary hold at either extreme.
+  useEffect(() => {
+    if (nFrames !== 2) return
+    const id = setInterval(() => setCrossActive((v) => !v), 1000)
+    return () => clearInterval(id)
+  }, [nFrames])
+
+  // N>2 hard-cut: advance one frame every 250 ms.
+  useEffect(() => {
+    if (nFrames <= 2) return
+    const id = setInterval(() => setFrame((f) => (f + 1) % nFrames), 250)
+    return () => clearInterval(id)
+  }, [nFrames])
+
+  const sheet = (frameIndex) => ({
+    width: size,
+    height: size * nFrames,
+    position: 'absolute',
+    top: -frameIndex * size,
+    imageRendering: 'pixelated',
+  })
+
+  if (nFrames === 2) {
+    return (
+      <div style={{ width: size, height: size, overflow: 'hidden', position: 'relative', flexShrink: 0 }}>
+        {/* Frame 0 — base layer, always fully opaque */}
+        <img src={src} alt="" draggable={draggable} onError={onError} style={sheet(0)} />
+        {/* Frame 1 — overlay whose opacity the 1 000 ms interval drives */}
+        <img src={src} alt="" draggable={draggable}
+          style={{ ...sheet(1), opacity: crossActive ? 1 : 0, transition: 'opacity 1s ease-in-out' }} />
+      </div>
+    )
+  }
+
+  return (
+    <div style={{ width: size, height: size, overflow: 'hidden', position: 'relative', flexShrink: 0 }}>
+      <img src={src} alt="" loading="lazy" draggable={draggable} onError={onError} style={sheet(frame)} />
     </div>
   )
 }
@@ -292,7 +387,7 @@ export function ItemTooltip({ name, lore }) {
 // overlay rendered only while hovering; `children` renders always.
 export function ItemSlot({
   texture, fallbackTexture, name, lore, size = 48,
-  draggable = false, onDragStart, title, children, hoverActions,
+  draggable = false, onDragStart, title, children, hoverActions, onClick,
 }) {
   const [hover, setHover] = useState(false)
   const [pos, setPos] = useState({ x: 0, y: 0 })
@@ -304,6 +399,7 @@ export function ItemSlot({
   return (
     <div
       className="relative shrink-0"
+      onClick={onClick}
       onMouseEnter={(e) => { setHover(true); setPos({ x: e.clientX, y: e.clientY }) }}
       onMouseMove={(e) => setPos({ x: e.clientX, y: e.clientY })}
       onMouseLeave={() => setHover(false)}
@@ -312,22 +408,22 @@ export function ItemSlot({
         draggable={draggable}
         onDragStart={onDragStart}
         title={title}
-        className="flex items-center justify-center border-2 border-zinc-400 dark:border-zinc-600 bg-zinc-300/70 dark:bg-zinc-700/70"
-        style={{ width: size, height: size, cursor: draggable ? 'grab' : 'default' }}
+        className="relative flex items-center justify-center border-2 border-zinc-400 dark:border-zinc-600 bg-zinc-300/70 dark:bg-zinc-700/70"
+        style={{ width: size, height: size, cursor: onClick ? 'pointer' : draggable ? 'grab' : 'default' }}
       >
         {src ? (
-          <img
+          <AnimatedTexture
             key={src}
             src={src}
-            alt={plainText(name)}
+            size={size - 10}
             draggable={false}
-            style={{ width: size - 10, height: size - 10, imageRendering: 'pixelated' }}
             onError={(e) => {
               if (texture && !primaryFailed) setPrimaryFailed(true)
               else e.currentTarget.style.visibility = 'hidden'
             }}
           />
         ) : null}
+        {onClick && hover && <div className="absolute inset-0 bg-white/20 pointer-events-none" />}
       </div>
       {children}
       {hover && hoverActions}
@@ -348,11 +444,10 @@ export function ItemSlot({
 // ---------------------------------------------------------------------------
 
 // A blank formatted-text object (legacy single-run shape; kept for callers that
-// still want one styled run).
-export const blankFmt = (text = '') => ({
-  text, color: '', bold: false, italic: false,
-  underlined: false, strikethrough: false, obfuscated: false,
-})
+// still want one styled run). Format flags are omitted so they default to the
+// Minecraft default rendering (italic for names/lore, etc.) rather than forcing
+// a state.
+export const blankFmt = (text = '') => ({ text, color: '' })
 
 // Texture URL for a custom model stem.
 export const textureUrl = (stem) => `${API_BASE}/api/textures/custom/${stem}.png`
@@ -424,14 +519,14 @@ function charsToLine(chars) {
 const escapeHtml = (s) => s.replace(/[&<>]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c]))
 
 // lines → HTML. One <div> per line; one <span data-fmt> per segment.
-function linesToHtml(lines) {
+function linesToHtml(lines, defaultItalic = false) {
   const list = lines.length ? lines : [[]]
   return list.map((line) => {
     const segs = asSegments(line).filter((s) => s.text)
     if (!segs.length) return '<div><br></div>'
     const inner = segs.map((s) => {
       const fmt = segFmt(s)
-      const style = Object.entries(segStyle(s))
+      const style = Object.entries(segStyle(s, defaultItalic))
         .filter(([, v]) => v != null)
         .map(([k, v]) => `${k.replace(/[A-Z]/g, (m) => '-' + m.toLowerCase())}:${v}`)
         .join(';')
@@ -547,19 +642,20 @@ function RichToolbar({ pos, active, onToggle, onColor }) {
       style={{ left: pos.left, top: pos.top, transform: 'translate(-50%, -100%)' }}
       onMouseDown={(e) => e.preventDefault()} /* keep the text selection alive */
     >
-      {FORMAT_FLAGS.map(([flag, Icon]) => (
-        <button
-          key={flag}
-          type="button"
-          title={flag}
-          onClick={() => onToggle(flag)}
-          className={`p-1.5 rounded-md transition-colors ${
-            active[flag] ? 'bg-zinc-100 text-zinc-900' : 'text-zinc-300 hover:bg-zinc-700'
-          }`}
-        >
-          <Icon size={14} />
-        </button>
-      ))}
+      {FORMAT_FLAGS.map(([flag, Icon]) => {
+        const state = active[flag]
+        const cls = state === true
+          ? 'bg-green-700 text-white'
+          : state === false
+          ? 'bg-red-700 text-white'
+          : 'text-zinc-300 hover:bg-zinc-700'
+        return (
+          <button key={flag} type="button" title={flag} onClick={() => onToggle(flag)}
+            className={`p-1.5 rounded-md transition-colors ${cls}`}>
+            <Icon size={14} />
+          </button>
+        )
+      })}
       <div className="w-px h-5 bg-zinc-700 mx-0.5" />
       {TOOLBAR_COLORS.map(([name, hex]) => (
         <button
@@ -583,7 +679,7 @@ function RichToolbar({ pos, active, onToggle, onColor }) {
   )
 }
 
-export function RichTextEditor({ value, onChange, singleLine = false, placeholder = '' }) {
+export function RichTextEditor({ value, onChange, singleLine = false, placeholder = '', defaultItalic = false, defaultColor = '#FFFFFF' }) {
   const ref = useRef(null)
   const lastEmitted = useRef(null)
   const [toolbar, setToolbar] = useState(null)
@@ -596,7 +692,7 @@ export function RichTextEditor({ value, onChange, singleLine = false, placeholde
   // user types, so the caret stays put.
   useLayoutEffect(() => {
     if (value === lastEmitted.current) return
-    if (ref.current) ref.current.innerHTML = linesToHtml(lines)
+    if (ref.current) ref.current.innerHTML = linesToHtml(lines, defaultItalic)
   }, [value]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const refreshToolbar = useCallback(() => {
@@ -617,7 +713,7 @@ export function RichTextEditor({ value, onChange, singleLine = false, placeholde
         const f = chars[i].fmt
         if (active === null) active = { ...f }
         else {
-          for (const k of FMT_KEYS) if (!f[k]) delete active[k]
+          for (const k of FMT_KEYS) if (active[k] !== f[k]) active[k] = undefined
           if ((f.color || '') !== (active.color || '')) active.color = undefined
         }
       }
@@ -649,18 +745,19 @@ export function RichTextEditor({ value, onChange, singleLine = false, placeholde
       for (let i = from; i < to; i++) chars[i].fmt = transform(chars[i].fmt)
       return charsToLine(chars)
     })
-    root.innerHTML = linesToHtml(next)
+    root.innerHTML = linesToHtml(next, defaultItalic)
     restoreSelection(root, range)
     emit(next)
     refreshToolbar()
   }
 
-  const toggleFlag = (flag) => {
-    const willEnable = !toolbar?.active?.[flag]
+  const cycleFlag = (flag) => {
+    const cur = toolbar?.active?.[flag]
+    const next = cur === undefined ? true : cur === true ? false : undefined
     applyToSelection((fmt) => {
       const f = { ...fmt }
-      if (willEnable) f[flag] = true
-      else delete f[flag]
+      if (next === undefined) delete f[flag]
+      else f[flag] = next
       return f
     })
   }
@@ -677,7 +774,7 @@ export function RichTextEditor({ value, onChange, singleLine = false, placeholde
     if ((e.ctrlKey || e.metaKey) && !e.altKey) {
       const k = e.key.toLowerCase()
       const map = { b: 'bold', i: 'italic', u: 'underlined' }
-      if (map[k]) { e.preventDefault(); toggleFlag(map[k]) }
+      if (map[k]) { e.preventDefault(); cycleFlag(map[k]) }
     }
   }
 
@@ -691,7 +788,7 @@ export function RichTextEditor({ value, onChange, singleLine = false, placeholde
         onInput={onInput}
         onKeyDown={onKeyDown}
         onBlur={() => setToolbar(null)}
-        style={{ background: '#100010', color: '#FFFFFF' }}
+        style={{ background: '#100010', color: defaultColor }}
         className="w-full min-h-[2.25rem] px-3 py-1.5 text-sm rounded-lg border-2 border-[#280050] focus:outline-none focus:ring-2 focus:ring-zinc-500 whitespace-pre-wrap break-words"
       />
       {isEmpty && (
@@ -700,7 +797,7 @@ export function RichTextEditor({ value, onChange, singleLine = false, placeholde
         </span>
       )}
       {toolbar && (
-        <RichToolbar pos={toolbar} active={toolbar.active} onToggle={toggleFlag} onColor={setColor} />
+        <RichToolbar pos={toolbar} active={toolbar.active} onToggle={cycleFlag} onColor={setColor} />
       )}
     </div>
   )

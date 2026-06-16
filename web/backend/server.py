@@ -9,9 +9,9 @@ import tempfile
 from pathlib import Path
 
 import httpx
-from fastapi import Body, FastAPI, File, Form, HTTPException, UploadFile
+from fastapi import Body, FastAPI, File, Form, HTTPException, Request, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
+from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 
 # Locate converter package relative to web/backend/
@@ -544,3 +544,18 @@ async def convert(
             raise
         except Exception as exc:
             raise HTTPException(status_code=500, detail=str(exc)) from exc
+
+
+# ---------------------------------------------------------------------------
+# SPA catch-all — serve index.html for any non-API path so that path-based
+# routing (e.g. /npc, /items) works on direct load or page refresh.
+# Only active when the frontend dist folder is present (production build).
+# ---------------------------------------------------------------------------
+_DIST_INDEX = _ROOT / "web" / "frontend" / "dist" / "index.html"
+
+if _DIST_INDEX.exists():
+    app.mount("/assets", StaticFiles(directory=str(_DIST_INDEX.parent / "assets")), name="spa_assets")
+
+    @app.get("/{full_path:path}", include_in_schema=False)
+    def spa_fallback(full_path: str, request: Request):  # noqa: ARG001
+        return FileResponse(str(_DIST_INDEX))

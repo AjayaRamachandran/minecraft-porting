@@ -1,10 +1,10 @@
 import { useState, useMemo, useRef, useEffect } from 'react'
 import {
-  Plus, Trash2, Crosshair, Download, Copy, Upload, X, MessageSquare, ChevronRight, Package, Search,
+  Plus, Trash2, Crosshair, Download, Copy, Upload, X, MessageSquare, ChevronRight, Package, Search, Check
 } from 'lucide-react'
 import {
-  API_BASE, ColorPicker, resolveColor, ItemSlot, textureUrl, buildGivePayload, fetchItems, jsonOrThrow,
-  manifestStem, manifestName, manifestLore, manifestLabel, manifestTextures,
+  API_BASE, ColorPicker, resolveColor, ItemSlot, textureUrl, baseTextureUrl, buildGivePayload, fetchItems, jsonOrThrow,
+  manifestStem, manifestName, manifestLore, manifestLabel, manifestTextures, plainText,
 } from './mc'
 
 let _uid = 0
@@ -35,7 +35,7 @@ function migrate(data) {
   const convs = Array.isArray(data.conversations) ? data.conversations : []
   let npcName = ''
   let nameColor = 'gold'
-  if (version === '1.1' || version === '1.2') {
+  if (version !== '1.0') {
     npcName = data.npc_name || ''
     nameColor = data.name_color || 'gold'
   } else {
@@ -54,6 +54,13 @@ function migrate(data) {
         text: ch.text || '',
         direct: String(ch.direct ?? ''),
         items: (ch.items || []).map(choiceItemFromJson),
+        gates: {
+          scoreboard: ch.gates?.scoreboard
+            ? { objective: String(ch.gates.scoreboard.objective || ''), score: String(ch.gates.scoreboard.score ?? '0') }
+            : null,
+          held_item: ch.gates?.held_item ? choiceItemFromJson(ch.gates.held_item) : null,
+          consume_held_item: ch.gates?.consume_held_item !== false,
+        },
       })),
     })),
   }
@@ -62,7 +69,7 @@ function migrate(data) {
 // Editor model → exportable 1.2 JSON (drops internal ids and display fields).
 function toJson(state) {
   return {
-    builder_version: '1.2',
+    builder_version: '1.3',
     npc_variable_initial: state.npc_variable_initial,
     npc_name: state.npc_name,
     name_color: state.name_color,
@@ -72,6 +79,18 @@ function toJson(state) {
       choices: c.choices.map((ch) => {
         const out = { text: ch.text, direct: ch.direct }
         if (ch.items?.length) out.items = ch.items.map(choiceItemToJson)
+        const gates = {}
+        if (ch.gates?.scoreboard?.objective?.trim()) {
+          gates.scoreboard = {
+            objective: ch.gates.scoreboard.objective.trim(),
+            score: parseInt(ch.gates.scoreboard.score, 10) || 0,
+          }
+        }
+        if (ch.gates?.held_item) {
+          gates.held_item = choiceItemToJson(ch.gates.held_item)
+          gates.consume_held_item = ch.gates?.consume_held_item !== false
+        }
+        if (Object.keys(gates).length) out.gates = gates
         return out
       }),
     })),
@@ -88,7 +107,13 @@ const blankState = () => ({
 })
 
 export default function NpcMaker() {
-  const [state, setState] = useState(blankState)
+  const [state, setState] = useState(() => {
+    try {
+      const saved = sessionStorage.getItem('npc_draft')
+      if (saved) return migrate(JSON.parse(saved))
+    } catch { /* ignore parse errors */ }
+    return blankState()
+  })
   // linking = { messageId, choiceId } when the user is picking a link target.
   const [linking, setLinking] = useState(null)
   const [showImport, setShowImport] = useState(false)
@@ -102,10 +127,24 @@ export default function NpcMaker() {
   const [library, setLibrary] = useState([])
   const [libQuery, setLibQuery] = useState('')
   const [dragOverChoice, setDragOverChoice] = useState(null)
+  const [dragOverGate, setDragOverGate] = useState(null)
+  const [conditionMenuFor, setConditionMenuFor] = useState(null) // choiceId | null
+  const [heldItemPending, setHeldItemPending] = useState(() => new Set()) // choiceIds awaiting item drop
 
   useEffect(() => {
     fetchItems().then(setLibrary).catch(() => setLibrary([]))
   }, [])
+
+  useEffect(() => {
+    try { sessionStorage.setItem('npc_draft', JSON.stringify(toJson(state))) } catch { /* quota */ }
+  }, [state])
+
+  useEffect(() => {
+    if (!conditionMenuFor) return
+    const close = () => setConditionMenuFor(null)
+    document.addEventListener('mousedown', close)
+    return () => document.removeEventListener('mousedown', close)
+  }, [conditionMenuFor])
 
   const onDropOnChoice = (e, messageId, choiceId) => {
     e.preventDefault()
@@ -116,6 +155,43 @@ export default function NpcMaker() {
       dropItemOnChoice(messageId, choiceId, JSON.parse(raw))
     } catch { /* ignore malformed drops */ }
   }
+
+  const onDropOnGateHeld = (e, messageId, choiceId) => {
+    e.preventDefault()
+    setDragOverGate(null)
+    const raw = e.dataTransfer.getData('application/x-mc-item')
+    if (!raw) return
+    try {
+      const manifest = JSON.parse(raw)
+      updateMessageChoices(messageId, (choices) =>
+        choices.map((ch) =>
+          ch.id === choiceId
+            ? { ...ch, gates: { ...ch.gates, held_item: choiceItemFromManifest(manifest) } }
+            : ch))
+    } catch { /* ignore malformed drops */ }
+  }
+
+  const clearChoiceGateHeldItem = (messageId, choiceId) =>
+    updateMessageChoices(messageId, (choices) =>
+      choices.map((ch) =>
+        ch.id === choiceId ? { ...ch, gates: { ...ch.gates, held_item: null } } : ch))
+
+  const updateChoiceGateScoreboard = (messageId, choiceId, patch) =>
+    updateMessageChoices(messageId, (choices) =>
+      choices.map((ch) =>
+        ch.id === choiceId
+          ? { ...ch, gates: { ...ch.gates, scoreboard: { ...(ch.gates?.scoreboard || {}), ...patch } } }
+          : ch))
+
+  const clearChoiceGateScoreboard = (messageId, choiceId) =>
+    updateMessageChoices(messageId, (choices) =>
+      choices.map((ch) =>
+        ch.id === choiceId ? { ...ch, gates: { ...ch.gates, scoreboard: null } } : ch))
+
+  const toggleChoiceGateConsume = (messageId, choiceId, value) =>
+    updateMessageChoices(messageId, (choices) =>
+      choices.map((ch) =>
+        ch.id === choiceId ? { ...ch, gates: { ...ch.gates, consume_held_item: value } } : ch))
 
   const tagSet = useMemo(
     () => new Set(state.conversations.map((c) => c.scoreboard_tag).filter(Boolean)),
@@ -161,7 +237,10 @@ export default function NpcMaker() {
     }))
 
   const addChoice = (messageId) =>
-    updateMessageChoices(messageId, (choices) => [...choices, { id: uid(), text: '', direct: '', items: [] }])
+    updateMessageChoices(messageId, (choices) => [
+      ...choices,
+      { id: uid(), text: '', direct: '', items: [], gates: { scoreboard: null, held_item: null, consume_held_item: true } },
+    ])
 
   const dropItemOnChoice = (messageId, choiceId, manifest) =>
     updateMessageChoices(messageId, (choices) =>
@@ -322,7 +401,7 @@ export default function NpcMaker() {
               </button>
             </div>
             <div className="flex items-center justify-between">
-              <p className="text-xs text-zinc-500 dark:text-zinc-400">Paste builder 1.0 or 1.1 JSON</p>
+              <p className="text-xs text-zinc-500 dark:text-zinc-400">Paste builder 1.0 – 1.3 JSON</p>
               <button
                 onClick={() => fileRef.current?.click()}
                 className="text-xs text-zinc-500 dark:text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200"
@@ -540,6 +619,147 @@ export default function NpcMaker() {
                           ))}
                         </div>
                       )}
+
+                      {/* Conditions — stacked full-width rows */}
+                      <div className="mt-1.5 space-y-1 pl-5">
+                        {/* Score condition row */}
+                        {ch.gates?.scoreboard != null && (
+                          <div className="flex items-center gap-2">
+                            <span className="w-px h-4 bg-zinc-300 dark:bg-zinc-600 shrink-0 ml-px" />
+                            <span className="text-xs text-zinc-500 dark:text-zinc-400 shrink-0 w-16">if score</span>
+                            <input
+                              value={ch.gates.scoreboard.objective ?? ''}
+                              onClick={(e) => e.stopPropagation()}
+                              onChange={(e) => updateChoiceGateScoreboard(message.id, ch.id, { objective: e.target.value.replace(/\s+/g, '') })}
+                              placeholder="objective"
+                              className="flex-1 min-w-0 px-2 py-1 text-xs rounded-lg border border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-900 focus:outline-none focus:ring-1 focus:ring-zinc-300 dark:focus:ring-zinc-600"
+                            />
+                            <span className="text-xs text-zinc-400">is</span>
+                            <input
+                              value={ch.gates.scoreboard.score ?? ''}
+                              onClick={(e) => e.stopPropagation()}
+                              onChange={(e) => updateChoiceGateScoreboard(message.id, ch.id, { score: e.target.value })}
+                              type="number"
+                              placeholder="0"
+                              className="w-16 px-2 py-1 text-xs rounded-lg border border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-900 focus:outline-none focus:ring-1 focus:ring-zinc-300 dark:focus:ring-zinc-600"
+                            />
+                            <button
+                              onClick={(e) => { e.stopPropagation(); clearChoiceGateScoreboard(message.id, ch.id) }}
+                              className="p-1 rounded-md text-zinc-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-950 transition-colors shrink-0"
+                            >
+                              <Trash2 size={13} />
+                            </button>
+                          </div>
+                        )}
+
+                        {/* Holds item condition row — shows once added (pending or filled) */}
+                        {(ch.gates?.held_item != null || heldItemPending.has(ch.id)) && (
+                          <div
+                            onDragOver={(e) => { e.preventDefault(); e.stopPropagation(); e.dataTransfer.dropEffect = 'copy'; setDragOverGate(ch.id) }}
+                            onDragLeave={(e) => { if (!e.currentTarget.contains(e.relatedTarget)) setDragOverGate((c) => (c === ch.id ? null : c)) }}
+                            onDrop={(e) => {
+                              e.stopPropagation()
+                              onDropOnGateHeld(e, message.id, ch.id)
+                              setHeldItemPending((s) => { const n = new Set(s); n.delete(ch.id); return n })
+                            }}
+                            className={`flex items-center gap-2 rounded-lg transition-colors ${dragOverGate === ch.id ? 'ring-1 ring-amber-400 ring-offset-1' : ''}`}
+                          >
+                            <span className="w-px h-4 bg-zinc-300 dark:bg-zinc-600 shrink-0 ml-px" />
+                            <span className="text-xs text-zinc-500 dark:text-zinc-400 shrink-0 w-20">if holding</span>
+                            {ch.gates?.held_item ? (
+                              <>
+                                <ItemSlot
+                                  texture={ch.gates.held_item._stem ? textureUrl(ch.gates.held_item._stem) : null}
+                                  fallbackTexture={baseTextureUrl(ch.gates.held_item.base_item)}
+                                  name={ch.gates.held_item.components['minecraft:custom_name'] || { text: ch.gates.held_item._label }}
+                                  lore={ch.gates.held_item.components['minecraft:lore'] || []}
+                                  size={32}
+                                />
+                                <span className="flex-1 min-w-0 text-xs text-zinc-700 dark:text-zinc-300 truncate">{ch.gates.held_item._label}</span>
+                                <button
+                                  onClick={(e) => { e.stopPropagation(); toggleChoiceGateConsume(message.id, ch.id, ch.gates?.consume_held_item === false) }}
+                                  className="flex items-center gap-1 text-xs text-zinc-500 dark:text-zinc-400 cursor-pointer shrink-0 select-none"
+                                  title="Remove the item from inventory when the player clicks this option"
+                                >
+                                  <span
+                                    className={`inline-flex items-center justify-center w-3.5 h-3.5 border-2 shrink-0 ${
+                                      ch.gates?.consume_held_item !== false
+                                        ? 'border-zinc-400 dark:border-zinc-500 bg-zinc-600 dark:bg-zinc-500'
+                                        : 'border-zinc-500 dark:border-zinc-600 bg-zinc-800 dark:bg-zinc-900'
+                                    }`}
+                                  >
+                                    {ch.gates?.consume_held_item !== false && (
+                                      <Check size={9} strokeWidth={3.5} strokeLinecap="square" strokeLinejoin="miter" className="text-zinc-100" />
+                                    )}
+                                  </span>
+                                  consume on click
+                                </button>
+                              </>
+                            ) : (
+                              <div className={`flex-1 flex items-center justify-center py-1 rounded-lg border border-dashed text-xs transition-colors ${
+                                dragOverGate === ch.id
+                                  ? 'border-amber-400 bg-amber-50/60 dark:bg-amber-950/30 text-amber-600'
+                                  : 'border-zinc-300 dark:border-zinc-600 text-zinc-400'
+                              }`}>
+                                drag item from library
+                              </div>
+                            )}
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation()
+                                clearChoiceGateHeldItem(message.id, ch.id)
+                                setHeldItemPending((s) => { const n = new Set(s); n.delete(ch.id); return n })
+                              }}
+                              className="p-1 rounded-md text-zinc-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-950 transition-colors shrink-0"
+                            >
+                              <Trash2 size={13} />
+                            </button>
+                          </div>
+                        )}
+
+                        {/* Add condition button + dropdown */}
+                        {(ch.gates?.scoreboard == null || (ch.gates?.held_item == null && !heldItemPending.has(ch.id))) && (
+                          <div
+                            className="relative"
+                            onMouseDown={(e) => e.stopPropagation()}
+                          >
+                            <button
+                              onClick={(e) => { e.stopPropagation(); setConditionMenuFor((cur) => cur === ch.id ? null : ch.id) }}
+                              className="flex items-center gap-1.5 text-xs font-medium text-zinc-500 dark:text-zinc-400 hover:text-zinc-800 dark:hover:text-zinc-200 transition-colors"
+                            >
+                              <Plus size={13} /> Add condition
+                            </button>
+                            {conditionMenuFor === ch.id && (
+                              <div className="absolute left-0 top-full mt-0.5 z-20 bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-lg shadow-lg py-0.5 min-w-[160px]">
+                                {ch.gates?.scoreboard == null && (
+                                  <button
+                                    onClick={(e) => {
+                                      e.stopPropagation()
+                                      updateChoiceGateScoreboard(message.id, ch.id, { objective: '', score: '' })
+                                      setConditionMenuFor(null)
+                                    }}
+                                    className="w-full px-3 py-1.5 text-xs text-left text-zinc-700 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-700 transition-colors"
+                                  >
+                                    Only if score is
+                                  </button>
+                                )}
+                                {ch.gates?.held_item == null && !heldItemPending.has(ch.id) && (
+                                  <button
+                                    onClick={(e) => {
+                                      e.stopPropagation()
+                                      setHeldItemPending((s) => new Set([...s, ch.id]))
+                                      setConditionMenuFor(null)
+                                    }}
+                                    className="w-full px-3 py-1.5 text-xs text-left text-zinc-700 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-700 transition-colors"
+                                  >
+                                    Only if holding item
+                                  </button>
+                                )}
+                              </div>
+                            )}
+                          </div>
+                        )}
+                      </div>
                     </div>
                   )
                 })}

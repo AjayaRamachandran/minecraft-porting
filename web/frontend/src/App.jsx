@@ -17,11 +17,33 @@ export default function App() {
   const [dark, setDark] = useState(() =>
     typeof window !== 'undefined' && window.matchMedia('(prefers-color-scheme: dark)').matches
   )
-  const [tool, setTool] = useState('converter')
+  const [tool, setTool] = useState(() => {
+    const seg = window.location.pathname.replace(/^\//, '').split('/')[0]
+    return TOOLS.find((t) => t.key === seg) ? seg : 'converter'
+  })
 
   useEffect(() => {
     document.documentElement.classList.toggle('dark', dark)
   }, [dark])
+
+  const navigate = (key) => {
+    setTool(key)
+    window.history.pushState({ tool: key }, '', `/${key}`)
+  }
+
+  useEffect(() => {
+    // Keep URL in sync on first render (e.g. landing on /)
+    window.history.replaceState({ tool }, '', `/${tool}`)
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
+
+  useEffect(() => {
+    const onPopState = (e) => {
+      const key = e.state?.tool
+      if (key && TOOLS.find((t) => t.key === key)) setTool(key)
+    }
+    window.addEventListener('popstate', onPopState)
+    return () => window.removeEventListener('popstate', onPopState)
+  }, [])
 
   const Active = TOOLS.find((t) => t.key === tool).Component
 
@@ -37,7 +59,7 @@ export default function App() {
           {TOOLS.map(({ key, label, icon: Icon }) => (
             <button
               key={key}
-              onClick={() => setTool(key)}
+              onClick={() => navigate(key)}
               className={`w-full flex items-center gap-2.5 px-3 py-2 text-sm rounded-lg transition-colors ${
                 tool === key
                   ? 'bg-zinc-100 dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 font-medium'
