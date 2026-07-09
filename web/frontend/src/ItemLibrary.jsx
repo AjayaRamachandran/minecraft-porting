@@ -592,31 +592,36 @@ export default function ItemLibrary() {
                   ? "Update item"
                   : "Save item"}
             </button>
+            {/* Copy /give for the current draft — works before the item is saved. */}
+            <button
+              onClick={() =>
+                copyGive({
+                  id: draft.id ?? "__draft__",
+                  manifest: draftToManifest(draft),
+                })
+              }
+              disabled={!canSave}
+              title={
+                copiedId === (draft.id ?? "__draft__")
+                  ? "Copied!"
+                  : "Copy /give command"
+              }
+              className="flex items-center gap-1.5 px-3 py-2 text-sm rounded-lg border border-zinc-200 dark:border-zinc-700 text-zinc-600 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-700 transition-colors"
+            >
+              {copiedId === (draft.id ?? "__draft__") ? (
+                <Copy size={14} />
+              ) : (
+                <Terminal size={14} />
+              )}
+              {copiedId === (draft.id ?? "__draft__") ? "Copied!" : "/give"}
+            </button>
             {draft.id && (
-              <>
-                <button
-                  onClick={() =>
-                    copyGive({ id: draft.id, manifest: draftToManifest(draft) })
-                  }
-                  title={
-                    copiedId === draft.id ? "Copied!" : "Copy /give command"
-                  }
-                  className="flex items-center gap-1.5 px-3 py-2 text-sm rounded-lg border border-zinc-200 dark:border-zinc-700 text-zinc-600 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-700 transition-colors"
-                >
-                  {copiedId === draft.id ? (
-                    <Copy size={14} />
-                  ) : (
-                    <Terminal size={14} />
-                  )}
-                  {copiedId === draft.id ? "Copied!" : "/give"}
-                </button>
-                <button
-                  onClick={() => remove(draft.id)}
-                  className="flex items-center gap-1.5 px-3 py-2 text-sm rounded-lg border border-red-200 dark:border-red-900 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950 transition-colors"
-                >
-                  <Trash2 size={14} /> Delete
-                </button>
-              </>
+              <button
+                onClick={() => remove(draft.id)}
+                className="flex items-center gap-1.5 px-3 py-2 text-sm rounded-lg border border-red-200 dark:border-red-900 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950 transition-colors"
+              >
+                <Trash2 size={14} /> Delete
+              </button>
             )}
           </div>
         </div>

@@ -3,10 +3,15 @@ from __future__ import annotations
 
 import base64
 import json
+import mimetypes
 import os
 import sys
 import tempfile
 from pathlib import Path
+
+# Some Windows Python installs lack a .webp mapping, which makes StaticFiles
+# serve villager preview renders as text/plain. Register it explicitly.
+mimetypes.add_type("image/webp", ".webp")
 
 import httpx
 from fastapi import Body, FastAPI, File, Form, HTTPException, Request, UploadFile
@@ -63,6 +68,12 @@ if TEXTURES_DIR.is_dir():
 BASE_TEXTURES_DIR = _ROOT / "base_textures"
 if BASE_TEXTURES_DIR.is_dir():
     app.mount("/api/base-textures", StaticFiles(directory=str(BASE_TEXTURES_DIR)), name="base_textures")
+
+# Villager biome/profession preview renders (mirrored from the wiki), served as
+# /api/villager-textures/<biome>_<profession>.webp for the Villager Maker preview.
+VILLAGER_TEXTURES_DIR = Path(__file__).resolve().parent / "villager_textures"
+if VILLAGER_TEXTURES_DIR.is_dir():
+    app.mount("/api/villager-textures", StaticFiles(directory=str(VILLAGER_TEXTURES_DIR)), name="villager_textures")
 
 # Lazily-built, cached catalog of selectable custom models (stem + base item).
 _MODEL_CATALOG: list[dict] | None = None
@@ -140,6 +151,17 @@ def _supabase(method: str, *, params: dict | None = None, json: object | None = 
     }
     try:
         resp = httpx.request(method, url, params=params, json=json, headers=headers, timeout=15.0)
+    except (httpx.ConnectError, httpx.ConnectTimeout) as exc:
+        # A paused/spun-down Supabase project refuses connections (surfaces as
+        # ConnectError, e.g. "[Errno 16] Device or resource busy"). Give the user
+        # an actionable message instead of the raw socket error.
+        raise HTTPException(
+            status_code=503,
+            detail=(
+                "Supabase database has been spun down. Spin it up again at "
+                "https://supabase.com/dashboard/project/trhukvbjdijydyikhbpd"
+            ),
+        ) from exc
     except httpx.HTTPError as exc:
         raise HTTPException(status_code=502, detail=f"Storage request failed: {exc}") from exc
     if resp.status_code >= 400:
@@ -461,6 +483,133 @@ def give_command(payload: dict = Body(...)):
     except Exception as exc:  # noqa: BLE001
         raise HTTPException(status_code=400, detail=f"Could not render command: {exc}") from exc
     return {"command": f"/{body}"}
+
+
+# ---------------------------------------------------------------------------
+# Villager Maker — render a trading-villager spawn egg as a /give command.
+#
+# The output is a single `villager_spawn_egg` carrying `minecraft:entity_data`
+# with a non-moving, invulnerable villager (Silent/NoAI/PersistenceRequired) and
+# an `Offers.Recipes` list built from the editor's drag-and-drop trade slots.
+# Item components round-trip through the same SNBT renderer the Item Library
+# uses, so custom names, models, lore, enchantments, etc. survive verbatim.
+# ---------------------------------------------------------------------------
+VILLAGER_LEVEL = 99          # high enough that every trade tier is unlocked
+VILLAGER_DEFAULT_MAX_USES = 99999999
+
+
+def _villager_recipe_item(payload: object) -> dict | None:
+    """A give-payload ``{base_item, count, components}`` → a recipe item
+    ``{id, count, components}`` (villager trades reference items by ``id``)."""
+    if not isinstance(payload, dict) or not payload.get("base_item"):
+        return None
+    norm = npc_builder._norm_item(payload)
+    item = {"id": f"minecraft:{norm['base_item']}", "count": norm["count"]}
+    if norm["components"]:  # omit an empty component compound for plain items
+        item["components"] = norm["components"]
+    return item
+
+
+@app.post("/api/villager/give-command")
+def villager_give_command(payload: dict = Body(...)):
+    """Build a ``/give`` command for a static trading villager spawn egg."""
+    try:
+        ItemConverter, Num, Str = npc_builder._converter_imports()
+
+        name_comp = payload.get("name") or None  # a Minecraft text component
+        biome = str(payload.get("biome") or "plains").replace("minecraft:", "")
+        profession = str(payload.get("profession") or "none").replace("minecraft:", "")
+        level = int(payload.get("level") or VILLAGER_LEVEL)
+
+        recipes: list[dict] = []
+        for t in payload.get("trades") or []:
+            buy = _villager_recipe_item(t.get("buy"))
+            buy_b = _villager_recipe_item(t.get("buyB"))
+            sell = _villager_recipe_item(t.get("sell"))
+            if not buy or not sell:  # a valid trade needs at least buy + sell
+                continue
+            recipe = {"maxUses": int(t.get("max_uses") or VILLAGER_DEFAULT_MAX_USES), "buy": buy}
+            if buy_b:
+                recipe["buyB"] = buy_b
+            recipe["sell"] = sell
+            recipes.append(recipe)
+
+        # A non-moving, unkillable, persistent villager.
+        entity: dict = {
+            "id": "minecraft:villager",
+            "Silent": True,
+            "Invulnerable": True,
+            "PersistenceRequired": True,
+            "NoAI": True,
+            "Willing": True,
+            "VillagerData": {
+                "level": level,
+                "profession": f"minecraft:{profession}",
+                "type": f"minecraft:{biome}",
+            },
+        }
+        if name_comp:
+            entity["CustomName"] = name_comp
+        if recipes:
+            entity["Offers"] = {"Recipes": recipes}
+
+        top: dict = {"minecraft:entity_data": entity}
+        if name_comp:
+            top["minecraft:custom_name"] = name_comp
+
+        comps = {k: npc_builder._json_to_snbt(v, Num, Str) for k, v in top.items()}
+        bracket = ItemConverter.render_components_bracket(comps)
+    except Exception as exc:  # noqa: BLE001
+        raise HTTPException(status_code=400, detail=f"Could not render command: {exc}") from exc
+    return {"command": f"/give @p minecraft:villager_spawn_egg{bracket} 1"}
+
+
+def _slot_from_recipe_item(it: object) -> dict | None:
+    """Recipe item ``{id, count, components}`` → editor give-payload
+    ``{base_item, count, components}``. Returns ``None`` for a missing slot."""
+    if not isinstance(it, dict):
+        return None
+    iid = str(it.get("id") or "").replace("minecraft:", "")
+    if not iid:
+        return None
+    return {"base_item": iid, "count": int(it.get("count") or 1), "components": it.get("components") or {}}
+
+
+@app.post("/api/villager/import")
+def villager_import(payload: dict = Body(...)):
+    """Parse a villager-spawn-egg ``/give`` command back into editor state."""
+    text = str(payload.get("command") or "").strip()
+    try:
+        manifests = _manifests_from_command(text)
+    except Exception as exc:  # noqa: BLE001
+        raise HTTPException(status_code=400, detail=f"Could not parse command: {exc}") from exc
+    if not manifests:
+        raise HTTPException(status_code=400, detail="No /give command found.")
+
+    comps = manifests[0].get("components") or {}
+    entity = comps.get("minecraft:entity_data")
+    if not isinstance(entity, dict):
+        raise HTTPException(status_code=400, detail="Command has no villager entity_data.")
+
+    vdata = entity.get("VillagerData") if isinstance(entity.get("VillagerData"), dict) else {}
+    biome = str(vdata.get("type") or "plains").replace("minecraft:", "")
+    profession = str(vdata.get("profession") or "none").replace("minecraft:", "")
+    name = entity.get("CustomName") or comps.get("minecraft:custom_name") or None
+
+    offers = entity.get("Offers") if isinstance(entity.get("Offers"), dict) else {}
+    recipes = offers.get("Recipes") if isinstance(offers.get("Recipes"), list) else []
+    trades = []
+    for r in recipes:
+        if not isinstance(r, dict):
+            continue
+        trades.append({
+            "buy": _slot_from_recipe_item(r.get("buy")),
+            "buyB": _slot_from_recipe_item(r.get("buyB")),
+            "sell": _slot_from_recipe_item(r.get("sell")),
+            "max_uses": int(r.get("maxUses") or VILLAGER_DEFAULT_MAX_USES),
+        })
+
+    return {"name": name, "biome": biome, "profession": profession, "trades": trades}
 
 
 @app.post("/api/npc/generate")

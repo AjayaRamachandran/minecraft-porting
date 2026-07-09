@@ -852,3 +852,19 @@ export const giveCommand = (manifest) =>
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ manifest }),
   }).then(jsonOrThrow).then((d) => d.command)
+
+// Render a trading-villager spawn egg as a /give command from editor state.
+export const villagerGiveCommand = (payload) =>
+  fetch(`${API_BASE}/api/villager/give-command`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  }).then(jsonOrThrow).then((d) => d.command)
+
+// Parse a villager /give command back into editor state (name/biome/profession/trades).
+export const villagerImport = (command) =>
+  fetch(`${API_BASE}/api/villager/import`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ command }),
+  }).then(jsonOrThrow)

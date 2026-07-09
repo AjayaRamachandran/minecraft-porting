@@ -1,8 +1,9 @@
 import { useState, useEffect } from 'react'
-import { RefreshCw, Bot, Package } from 'lucide-react'
+import { RefreshCw, Bot, Package, Store } from 'lucide-react'
 import { SunIcon, MoonIcon } from './icons'
 import ConverterView from './ConverterView'
 import NpcMaker from './NpcMaker'
+import VillagerMaker from './VillagerMaker'
 import ItemLibrary from './ItemLibrary'
 
 // Left-rail tools. This is the top hierarchical level — one above the
@@ -10,6 +11,7 @@ import ItemLibrary from './ItemLibrary'
 const TOOLS = [
   { key: 'converter', label: 'Converter', icon: RefreshCw, Component: ConverterView },
   { key: 'npc', label: 'NPC Maker', icon: Bot, Component: NpcMaker },
+  { key: 'villager', label: 'Villager Maker', icon: Store, Component: VillagerMaker },
   { key: 'items', label: 'Item Library', icon: Package, Component: ItemLibrary },
 ]
 
