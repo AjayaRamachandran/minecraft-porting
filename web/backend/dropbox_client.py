@@ -157,11 +157,28 @@ def download_zip(path: str) -> bytes:
     return resp.content
 
 
+# Opportunistic in-memory cache of minted temporary links. On Vercel this only
+# helps while a single function instance stays warm (cold starts wipe it and
+# concurrent instances don't share it), so nothing load-bearing depends on it —
+# the real caching happens in the browser via Cache-Control on the redirect.
+# Dropbox temporary links live ~4h; we expire ours early with a safety margin.
+_LINK_TTL = 3.5 * 3600
+_link_cache: dict[str, tuple[str, float]] = {}
+
+
 def temporary_link(path: str) -> str:
     """Return a short-lived (~4h) direct link to a file, usable as an <img> src.
-    Cheaper than a shared link for previews; requires files.content.read."""
+    Cheaper than a shared link for previews; requires files.content.read.
+
+    Reuses a cached link for `path` if one was minted recently (best-effort;
+    see :data:`_link_cache`)."""
+    hit = _link_cache.get(path)
+    if hit and time.time() < hit[1]:
+        return hit[0]
     data = _rpc("/files/get_temporary_link", {"path": path})
-    return data["link"]
+    link = data["link"]
+    _link_cache[path] = (link, time.time() + _LINK_TTL)
+    return link
 
 
 def shared_link(path: str) -> str:

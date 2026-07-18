@@ -322,20 +322,42 @@ export function AnimatedTexture({ src, size, onError, draggable = false }) {
   const [nFrames, setNFrames] = useState(1)
   const [frame, setFrame] = useState(0)
   const [crossActive, setCrossActive] = useState(false)
+  const [visible, setVisible] = useState(false)
+  const containerRef = useRef(null)
+
+  // Defer all network work until the slot scrolls near the viewport. Without
+  // this, the dimension probe below fires for every slot on mount — off-screen
+  // included — which would hit Dropbox once per item the moment a grid renders.
+  // The empty container is always mounted so the observer has something to watch.
+  useEffect(() => {
+    if (visible) return
+    const el = containerRef.current
+    if (!el) return
+    if (typeof IntersectionObserver === 'undefined') { setVisible(true); return }
+    const obs = new IntersectionObserver((entries) => {
+      if (entries.some((e) => e.isIntersecting)) { setVisible(true); obs.disconnect() }
+    }, { rootMargin: '200px' })
+    obs.observe(el)
+    return () => obs.disconnect()
+  }, [visible])
+
+  // Once visible, this is the src we actually load; before that it's null so
+  // neither the probe nor the <img> touches the network.
+  const activeSrc = visible ? src : null
 
   // Probe dimensions with a hidden Image so we know the frame count before
   // the visible <img> elements need to paint. Also resets all animation state
   // when src changes so a new texture never inherits stale timing.
   useEffect(() => {
     setNFrames(1); setFrame(0); setCrossActive(false)
-    if (!src) return
+    if (!activeSrc) return
     const probe = new Image()
     probe.onload = () => {
       const n = probe.naturalHeight / probe.naturalWidth
       if (Number.isInteger(n) && n > 1) setNFrames(n)
     }
-    probe.src = src
-  }, [src])
+    probe.src = activeSrc
+  }, [activeSrc])
 
   // 2-frame crossfade: toggle the overlay opacity every 1 000 ms. The CSS
   // transition on the overlay also runs for 1 000 ms, producing a continuous
@@ -361,21 +383,25 @@ export function AnimatedTexture({ src, size, onError, draggable = false }) {
     imageRendering: 'pixelated',
   })
 
+  const boxStyle = { width: size, height: size, overflow: 'hidden', position: 'relative', flexShrink: 0 }
+
   if (nFrames === 2) {
     return (
-      <div style={{ width: size, height: size, overflow: 'hidden', position: 'relative', flexShrink: 0 }}>
+      <div ref={containerRef} style={boxStyle}>
         {/* Frame 0 — base layer, always fully opaque */}
-        <img src={src} alt="" draggable={draggable} onError={onError} style={sheet(0)} />
+        <img src={activeSrc} alt="" draggable={draggable} onError={onError} style={sheet(0)} />
         {/* Frame 1 — overlay whose opacity the 1 000 ms interval drives */}
-        <img src={src} alt="" draggable={draggable}
+        <img src={activeSrc} alt="" draggable={draggable}
           style={{ ...sheet(1), opacity: crossActive ? 1 : 0, transition: 'opacity 1s ease-in-out' }} />
       </div>
     )
   }
 
   return (
-    <div style={{ width: size, height: size, overflow: 'hidden', position: 'relative', flexShrink: 0 }}>
-      <img src={src} alt="" loading="lazy" draggable={draggable} onError={onError} style={sheet(frame)} />
+    <div ref={containerRef} style={boxStyle}>
+      {activeSrc && (
+        <img src={activeSrc} alt="" loading="lazy" draggable={draggable} onError={onError} style={sheet(frame)} />
+      )}
     </div>
   )
 }
@@ -449,8 +475,11 @@ export function ItemSlot({
 // a state.
 export const blankFmt = (text = '') => ({ text, color: '' })
 
-// Texture URL for a custom model stem.
-export const textureUrl = (stem) => `${API_BASE}/api/textures/custom/${stem}.png`
+// Texture URL for a custom model stem. Resolves to the Dropbox-backed thumb
+// endpoint (a 302 to a short-lived Dropbox link, browser-cached), so uploaded
+// textures are live without a redeploy.
+export const textureUrl = (stem) =>
+  `${API_BASE}/api/texture/thumb/${encodeURIComponent(stem)}`
 // Vanilla base-item texture, used when an item inherits the base game look.
 export const baseTextureUrl = (baseItem) =>
   baseItem ? `${API_BASE}/api/base-textures/${String(baseItem).replace(/^minecraft:/, '')}.png` : null
@@ -982,6 +1011,6 @@ export const uploadTextures = ({ files, parent, overwrite = true }) => {
 export const syncTexturePack = () =>
   fetch(`${API_BASE}/api/texture/sync`, { method: 'POST' }).then(jsonOrThrow)
 
-// Preview URL for a custom texture (redirects to a short-lived Dropbox link).
-export const textureThumbUrl = (name) =>
-  `${API_BASE}/api/texture/thumb/${encodeURIComponent(name)}`
+// Preview URL for a custom texture — same Dropbox-backed thumb endpoint as
+// textureUrl (kept as a named alias for the Texture Pack tab's call sites).
+export const textureThumbUrl = textureUrl

@@ -7,6 +7,7 @@ import mimetypes
 import os
 import sys
 import tempfile
+import time
 from pathlib import Path
 
 # Some Windows Python installs lack a .webp mapping, which makes StaticFiles
@@ -36,7 +37,7 @@ sys.path.insert(0, str(_ROOT / "convert_villager"))
 sys.path.insert(0, str(_ROOT / "npc-maker"))
 
 from converter.cli import build_pipeline, process_mcfunction_file  # noqa: E402
-from converter.custom_models import load_custom_index, load_cmd_override_map  # noqa: E402
+from converter.custom_models import load_cmd_override_map  # noqa: E402
 from converter.implementors import schematic_file  # noqa: E402
 from converter.item_converter import ItemConverter  # noqa: E402
 from converter.snbt import Num, Str, TypedArr, snbt_parse  # noqa: E402
@@ -45,7 +46,6 @@ import builder as npc_builder  # noqa: E402  (npc-maker/builder.py)
 
 PACK_DIR = _ROOT / "1_21_11_pack"
 OLD_PACK_DIR = _ROOT / "1_20_1_pack"
-TEXTURES_DIR = PACK_DIR / "assets" / "minecraft" / "textures"
 
 # Default base item when a custom model has no override mapping in the old pack.
 DEFAULT_BASE_ITEM = "paper"
@@ -59,12 +59,13 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Serve resource-pack textures so the Item Library can show thumbnails, e.g.
-# GET /api/textures/custom/<stem>.png.
-if TEXTURES_DIR.is_dir():
-    app.mount("/api/textures", StaticFiles(directory=str(TEXTURES_DIR)), name="textures")
+# Custom-item thumbnails are no longer served from the local pack — they come
+# live from Dropbox via GET /api/texture/thumb/<stem> (see the Texture Pack
+# section below), so an uploaded texture is visible without a redeploy.
 
-# Vanilla item textures, for items that inherit the base game look.
+# Vanilla item textures, for items that inherit the base game look. These are
+# base-game assets that never change and aren't in the Dropbox pack (a resource
+# pack only carries overrides), so they stay served from the repo.
 BASE_TEXTURES_DIR = _ROOT / "base_textures"
 if BASE_TEXTURES_DIR.is_dir():
     app.mount("/api/base-textures", StaticFiles(directory=str(BASE_TEXTURES_DIR)), name="base_textures")
@@ -76,7 +77,11 @@ if VILLAGER_TEXTURES_DIR.is_dir():
     app.mount("/api/villager-textures", StaticFiles(directory=str(VILLAGER_TEXTURES_DIR)), name="villager_textures")
 
 # Lazily-built, cached catalog of selectable custom models (stem + base item).
+# Sourced live from Dropbox, so it carries a short TTL and is invalidated on
+# upload — a newly-uploaded texture shows up in the editors without a redeploy.
 _MODEL_CATALOG: list[dict] | None = None
+_MODEL_CATALOG_AT: float = 0.0
+_MODEL_CATALOG_TTL = 300  # seconds; backstop for uploads by another instance
 
 # Lazily-built, cached list of vanilla base-item ids we have textures for. This
 # is the set of valid base items the editors let a user pick from.
@@ -86,12 +91,19 @@ _BASE_ITEMS: list[str] | None = None
 def _build_model_catalog() -> list[dict]:
     """Catalog of custom models a user can pick a texture from.
 
-    Each entry is ``{stem, base_item, texture}``. ``base_item`` is the vanilla
-    item the model was originally attached to (from the old pack's overrides),
-    falling back to :data:`DEFAULT_BASE_ITEM`. ``texture`` is the path the
-    frontend loads from the ``/api/textures`` mount.
+    Each entry is ``{stem, base_item, texture}``. The stem list comes live from
+    the Dropbox pack's ``textures/custom`` folder (so uploads appear without a
+    redeploy). ``base_item`` is the vanilla item the model was originally
+    attached to, from the old pack's CMD overrides (historical, ships in the
+    repo) — falling back to :data:`DEFAULT_BASE_ITEM` for stems with no override
+    (e.g. brand-new uploads). ``texture`` is the Dropbox-backed thumb endpoint.
     """
-    stems = load_custom_index(PACK_DIR)
+    entries = _dbx.list_folder(_dbx_path(_CUSTOM_TEX))
+    stems = sorted(
+        Path(e["name"]).stem
+        for e in entries
+        if e.get(".tag") == "file" and e["name"].lower().endswith(".png")
+    )
     # Invert (base, cmd) -> stem into stem -> base_item (first mapping wins).
     stem_to_base: dict[str, str] = {}
     for (base, _cmd), stem in load_cmd_override_map(OLD_PACK_DIR).items():
@@ -100,7 +112,7 @@ def _build_model_catalog() -> list[dict]:
         {
             "stem": s,
             "base_item": stem_to_base.get(s, DEFAULT_BASE_ITEM),
-            "texture": f"/api/textures/custom/{s}.png",
+            "texture": f"/api/texture/thumb/{s}",
         }
         for s in stems
     ]
@@ -113,11 +125,15 @@ def health():
 
 @app.get("/api/items/models")
 def item_models():
-    """Return the searchable custom-model catalog (cached after first call)."""
-    global _MODEL_CATALOG
-    if _MODEL_CATALOG is None:
+    """Return the searchable custom-model catalog (cached, short TTL)."""
+    global _MODEL_CATALOG, _MODEL_CATALOG_AT
+    now = time.time()
+    if _MODEL_CATALOG is None or now - _MODEL_CATALOG_AT > _MODEL_CATALOG_TTL:
         try:
             _MODEL_CATALOG = _build_model_catalog()
+            _MODEL_CATALOG_AT = now
+        except _dbx.DropboxError as exc:
+            raise HTTPException(status_code=503, detail=str(exc)) from exc
         except Exception as exc:  # noqa: BLE001
             raise HTTPException(status_code=500, detail=str(exc)) from exc
     return {"models": _MODEL_CATALOG}
@@ -838,7 +854,12 @@ def texture_thumb(name: str):
     except _dbx.DropboxError as exc:
         code = 404 if "not_found" in str(exc) else 502
         raise HTTPException(status_code=code, detail=str(exc)) from exc
-    return RedirectResponse(link, status_code=302)
+    # Let the browser cache the redirect itself for ~50 min so repeat views
+    # don't re-hit this function (which matters on serverless, where we have no
+    # reliable shared server-side cache). The window stays well under Dropbox's
+    # ~4h link expiry so a cached redirect never points at a dead link.
+    return RedirectResponse(link, status_code=302,
+                            headers={"Cache-Control": "public, max-age=3000"})
 
 
 @app.post("/api/texture/upload")
@@ -874,6 +895,11 @@ async def texture_upload(
             results.append({"filename": f.filename, "name": name, "status": "error", "error": str(exc)})
 
     ok = sum(1 for r in results if r["status"] == "ok")
+    if ok:
+        # New textures landed — drop the cached catalog so this instance picks
+        # them up immediately (other warm instances catch up within the TTL).
+        global _MODEL_CATALOG
+        _MODEL_CATALOG = None
     return JSONResponse({"results": results, "ok": ok, "total": len(results)})
 
 
