@@ -16,7 +16,7 @@ mimetypes.add_type("image/webp", ".webp")
 import httpx
 from fastapi import Body, FastAPI, File, Form, HTTPException, Request, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse, JSONResponse
+from fastapi.responses import FileResponse, JSONResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 
 # Locate converter package relative to web/backend/
@@ -78,6 +78,10 @@ if VILLAGER_TEXTURES_DIR.is_dir():
 # Lazily-built, cached catalog of selectable custom models (stem + base item).
 _MODEL_CATALOG: list[dict] | None = None
 
+# Lazily-built, cached list of vanilla base-item ids we have textures for. This
+# is the set of valid base items the editors let a user pick from.
+_BASE_ITEMS: list[str] | None = None
+
 
 def _build_model_catalog() -> list[dict]:
     """Catalog of custom models a user can pick a texture from.
@@ -117,6 +121,23 @@ def item_models():
         except Exception as exc:  # noqa: BLE001
             raise HTTPException(status_code=500, detail=str(exc)) from exc
     return {"models": _MODEL_CATALOG}
+
+
+@app.get("/api/base-items")
+def base_items():
+    """Return the sorted list of vanilla base-item ids we have a texture for.
+
+    These are exactly the items the editors can render as a base-game item
+    (via the ``/api/base-textures`` mount), so it doubles as the set of valid
+    base items a user may type/select in the Item Library and villager slots.
+    """
+    global _BASE_ITEMS
+    if _BASE_ITEMS is None:
+        if BASE_TEXTURES_DIR.is_dir():
+            _BASE_ITEMS = sorted(p.stem for p in BASE_TEXTURES_DIR.glob("*.png"))
+        else:
+            _BASE_ITEMS = []
+    return {"items": _BASE_ITEMS}
 
 
 # ---------------------------------------------------------------------------
@@ -329,9 +350,48 @@ def _parse_item_string(s: str) -> dict:
     return _normalize_manifest(item_id.strip() or "paper", comps)
 
 
-def _manifests_from_command(text: str) -> list[dict]:
+def _trade_item_manifests(manifest: dict) -> list[dict] | None:
+    """If ``manifest`` is a villager spawn egg carrying trades, return the
+    buy/buyB/sell item of every recipe as its own item manifest. Returns ``None``
+    when the manifest isn't a trading villager egg, so the caller keeps the
+    original item as-is (a plain egg, or an egg with no Offers/Recipes)."""
+    if manifest.get("base_item") != "villager_spawn_egg":
+        return None
+    entity = (manifest.get("components") or {}).get("minecraft:entity_data")
+    if not isinstance(entity, dict):
+        return None
+    offers = entity.get("Offers") if isinstance(entity.get("Offers"), dict) else {}
+    recipes = offers.get("Recipes") if isinstance(offers.get("Recipes"), list) else []
+    if not recipes:
+        return None
+
+    out: list[dict] = []
+    for r in recipes:
+        if not isinstance(r, dict):
+            continue
+        for slot in ("buy", "buyB", "sell"):
+            it = r.get(slot)
+            if not isinstance(it, dict):
+                continue
+            iid = str(it.get("id") or "").strip()
+            if not iid:
+                continue
+            comps = it.get("components") if isinstance(it.get("components"), dict) else {}
+            # Skip plain vanilla items (e.g. emerald payment) — only trade goods
+            # carrying components are "custom" items worth adding to the library.
+            if not comps:
+                continue
+            out.append(_normalize_manifest(iid, comps))
+    return out
+
+
+def _manifests_from_command(text: str, expand_villager_trades: bool = False) -> list[dict]:
     """Parse every /give line in `text` into manifests. Handles modern
-    `item[components] count` and legacy `item{tag} count`."""
+    `item[components] count` and legacy `item{tag} count`.
+
+    When ``expand_villager_trades`` is set, a trading villager spawn egg is
+    replaced by the individual buy/sell items of its trades (used by the Item
+    Library import, which harvests trade goods rather than the raw egg)."""
     out: list[dict] = []
     pipeline = build_pipeline(PACK_DIR, threshold=0.5, old_pack_dir=OLD_PACK_DIR)
     for raw in text.splitlines():
@@ -381,7 +441,14 @@ def _manifests_from_command(text: str) -> list[dict]:
                         count = int(trailing.split()[0])
                     except ValueError:
                         pass
-        out.append(_normalize_manifest(item_id, comps))
+        manifest = _normalize_manifest(item_id, comps)
+        # A villager spawn egg is a container of trades, not a single custom
+        # item — expand it into the buy/sell items of its Offers instead.
+        trade_items = _trade_item_manifests(manifest) if expand_villager_trades else None
+        if trade_items is not None:
+            out.extend(trade_items)
+        else:
+            out.append(manifest)
     return out
 
 
@@ -461,7 +528,7 @@ async def import_items(
             raw = await file.read()
             manifests += _manifests_from_schem(raw)
         if text and text.strip():
-            manifests += _manifests_from_command(text)
+            manifests += _manifests_from_command(text, expand_villager_trades=True)
     except HTTPException:
         raise
     except Exception as exc:  # noqa: BLE001
@@ -693,6 +760,135 @@ async def convert(
             raise
         except Exception as exc:
             raise HTTPException(status_code=500, detail=str(exc)) from exc
+
+
+# ---------------------------------------------------------------------------
+# Texture Pack — manage the Dropbox-hosted server resource pack.
+#
+# Custom items follow a 3-file convention keyed on <name> (all relative to
+# the Unzipped Texture Pack folder on Dropbox):
+#   assets/minecraft/items/custom/<name>.json    -> item model definition
+#   assets/minecraft/models/custom/<name>.json   -> model (parent + layer0)
+#   assets/minecraft/textures/custom/<name>.png   -> the image
+# "Sync" repacks the whole Unzipped folder into a clean pack.zip and returns a
+# direct-download link for Apex Hosting to pull.
+# ---------------------------------------------------------------------------
+import re as _re  # local alias; module already imports plenty
+
+try:
+    from web.backend import dropbox_client as _dbx
+except ImportError:  # running from web/backend/ directly
+    import dropbox_client as _dbx  # type: ignore
+
+_CUSTOM_TEX = "assets/minecraft/textures/custom"
+_CUSTOM_MODEL = "assets/minecraft/models/custom"
+_CUSTOM_ITEM = "assets/minecraft/items/custom"
+_VALID_PARENTS = {"generated", "handheld"}
+_NAME_RE = _re.compile(r"[^a-z0-9_.-]")
+
+
+def _texture_name(filename: str) -> str:
+    """Derive a Minecraft-safe custom-item name from an uploaded filename."""
+    stem = Path(filename or "").stem.strip().lower().replace(" ", "_")
+    stem = _NAME_RE.sub("", stem)
+    return stem
+
+
+def _model_json(name: str, parent: str) -> bytes:
+    doc = {
+        "parent": f"minecraft:item/{parent}",
+        "textures": {"layer0": f"minecraft:custom/{name}"},
+    }
+    return json.dumps(doc, indent=2).encode("utf-8")
+
+
+def _item_def_json(name: str) -> bytes:
+    doc = {"model": {"type": "minecraft:model", "model": f"minecraft:custom/{name}"}}
+    return json.dumps(doc, indent=2).encode("utf-8")
+
+
+def _dbx_path(*parts: str) -> str:
+    return _dbx.UNZIPPED_DIR + "/" + "/".join(parts)
+
+
+@app.get("/api/texture/list")
+def texture_list():
+    """Names of custom textures currently in the Unzipped pack (sorted)."""
+    try:
+        entries = _dbx.list_folder(_dbx_path(_CUSTOM_TEX))
+    except _dbx.DropboxError as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+    names = sorted(
+        Path(e["name"]).stem
+        for e in entries
+        if e.get(".tag") == "file" and e["name"].lower().endswith(".png")
+    )
+    return {"textures": names, "count": len(names)}
+
+
+@app.get("/api/texture/thumb/{name}")
+def texture_thumb(name: str):
+    """Redirect to a short-lived Dropbox link for a custom texture PNG, so the
+    browser loads the image straight from Dropbox's CDN (and lazy-loads)."""
+    safe = _texture_name(name)
+    if not safe:
+        raise HTTPException(status_code=400, detail="invalid texture name")
+    try:
+        link = _dbx.temporary_link(_dbx_path(_CUSTOM_TEX, f"{safe}.png"))
+    except _dbx.DropboxError as exc:
+        code = 404 if "not_found" in str(exc) else 502
+        raise HTTPException(status_code=code, detail=str(exc)) from exc
+    return RedirectResponse(link, status_code=302)
+
+
+@app.post("/api/texture/upload")
+async def texture_upload(
+    files: list[UploadFile] = File(...),
+    parent: str = Form(default="generated"),
+    overwrite: bool = Form(default=True),
+) -> JSONResponse:
+    """Upload PNG(s): derive name, write the 2 JSON files + the PNG into the
+    Unzipped pack on Dropbox. Returns a per-file result list."""
+    if parent not in _VALID_PARENTS:
+        raise HTTPException(status_code=400, detail=f"parent must be one of {sorted(_VALID_PARENTS)}")
+
+    results = []
+    for f in files:
+        name = _texture_name(f.filename or "")
+        try:
+            data = await f.read()
+            if not name:
+                raise ValueError("could not derive a valid name from filename")
+            if data[:8] != b"\x89PNG\r\n\x1a\n":
+                raise ValueError("not a PNG file")
+            _dbx.upload(_dbx_path(_CUSTOM_TEX, f"{name}.png"), data, overwrite=overwrite)
+            _dbx.upload(_dbx_path(_CUSTOM_MODEL, f"{name}.json"), _model_json(name, parent),
+                        overwrite=overwrite)
+            _dbx.upload(_dbx_path(_CUSTOM_ITEM, f"{name}.json"), _item_def_json(name),
+                        overwrite=overwrite)
+            results.append({"filename": f.filename, "name": name, "status": "ok"})
+        except _dbx.DropboxError as exc:
+            msg = "already exists" if "already exists" in str(exc) else str(exc)
+            results.append({"filename": f.filename, "name": name, "status": "error", "error": msg})
+        except Exception as exc:  # noqa: BLE001 — surface per-file, keep going
+            results.append({"filename": f.filename, "name": name, "status": "error", "error": str(exc)})
+
+    ok = sum(1 for r in results if r["status"] == "ok")
+    return JSONResponse({"results": results, "ok": ok, "total": len(results)})
+
+
+@app.post("/api/texture/sync")
+def texture_sync() -> JSONResponse:
+    """Pull the whole Unzipped pack, repack it cleanly, upload as pack.zip, and
+    return a direct-download link for Apex to pull."""
+    try:
+        raw = _dbx.download_zip(_dbx.UNZIPPED_DIR)
+        packed = _dbx.repack_folder_zip(raw)
+        _dbx.upload(_dbx.ZIPPED_PATH, packed, overwrite=True)
+        link = _dbx.shared_link(_dbx.ZIPPED_PATH)
+    except _dbx.DropboxError as exc:
+        raise HTTPException(status_code=502, detail=str(exc)) from exc
+    return JSONResponse({"link": link, "bytes": len(packed), "path": _dbx.ZIPPED_PATH})
 
 
 # ---------------------------------------------------------------------------

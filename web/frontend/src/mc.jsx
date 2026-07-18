@@ -1,7 +1,7 @@
 // Shared Minecraft helpers: color constants, the color picker, text-format
 // toggles, the item slot + in-game-style tooltip, give-payload building, and
 // the Item Library API client. Used by both ItemLibrary and NpcMaker.
-import { useState, useRef, useEffect, useLayoutEffect, useCallback } from 'react'
+import { useState, useRef, useEffect, useLayoutEffect, useCallback, useMemo } from 'react'
 import { ChevronDown, Check, Hash, Bold, Italic, Underline, Strikethrough, Shuffle, Type } from 'lucide-react'
 
 export const API_BASE = ''
@@ -281,14 +281,14 @@ export function FormattedLine({ value, fallback = '', defaultItalic = false }) {
 // In-game-style tooltip: dark box, formatted name on top, lore lines below.
 // Custom names default to cyan/italic; lore defaults to light_purple/italic —
 // matching Minecraft's default rendering for these components.
-export function ItemTooltip({ name, lore }) {
+export function ItemTooltip({ name, lore, nameItalic = true }) {
   return (
     <div
       className="pointer-events-none whitespace-nowrap px-2 py-1.5 text-sm leading-tight border-2"
       style={{ background: '#100010F0', borderColor: '#280050', fontFamily: 'inherit' }}
     >
       <div style={{ color: resolveColor('white') }}>
-        <FormattedLine value={name} fallback="Unnamed item" defaultItalic={true} />
+        <FormattedLine value={name} fallback="Unnamed item" defaultItalic={nameItalic} />
       </div>
       {(lore || []).map((line, i) => (
         <div key={i} style={{ color: resolveColor('light_purple') }}>
@@ -386,7 +386,7 @@ export function AnimatedTexture({ src, size, onError, draggable = false }) {
 // up-and-to-the-right of the cursor (TOOLTIP_OFFSET_*). `hoverActions` is an
 // overlay rendered only while hovering; `children` renders always.
 export function ItemSlot({
-  texture, fallbackTexture, name, lore, size = 48,
+  texture, fallbackTexture, name, lore, size = 48, nameItalic = true,
   draggable = false, onDragStart, title, children, hoverActions, onClick,
 }) {
   const [hover, setHover] = useState(false)
@@ -407,7 +407,7 @@ export function ItemSlot({
       <div
         draggable={draggable}
         onDragStart={onDragStart}
-        title={title}
+        // title={title}
         className="relative flex items-center justify-center border-2 border-zinc-400 dark:border-zinc-600 bg-zinc-300/70 dark:bg-zinc-700/70"
         style={{ width: size, height: size, cursor: onClick ? 'pointer' : draggable ? 'grab' : 'default' }}
       >
@@ -432,7 +432,7 @@ export function ItemSlot({
           className="fixed z-50"
           style={{ left: pos.x + TOOLTIP_OFFSET_X, top: pos.y - TOOLTIP_OFFSET_Y }}
         >
-          <ItemTooltip name={name} lore={lore} />
+          <ItemTooltip name={name} lore={lore} nameItalic={nameItalic} />
         </div>
       )}
     </div>
@@ -454,6 +454,86 @@ export const textureUrl = (stem) => `${API_BASE}/api/textures/custom/${stem}.png
 // Vanilla base-item texture, used when an item inherits the base game look.
 export const baseTextureUrl = (baseItem) =>
   baseItem ? `${API_BASE}/api/base-textures/${String(baseItem).replace(/^minecraft:/, '')}.png` : null
+
+// ---------------------------------------------------------------------------
+// Base-item combobox — a text field that live-filters the list of valid vanilla
+// base items as you type and only commits a value when one is picked, so the
+// result is always a real Minecraft item. `options` is the id list from
+// fetchBaseItems(); `onChange` fires with the chosen id.
+// ---------------------------------------------------------------------------
+export function BaseItemPicker({
+  value, onChange, options, disabled = false,
+  placeholder = 'search base items…', autoFocus = false, startOpen = false,
+}) {
+  const [open, setOpen] = useState(startOpen)
+  const [query, setQuery] = useState(startOpen ? '' : null) // null → mirror `value`
+  const ref = useRef(null)
+
+  useEffect(() => {
+    if (!open) return
+    const onDown = (e) => { if (ref.current && !ref.current.contains(e.target)) { setOpen(false); setQuery(null) } }
+    document.addEventListener('mousedown', onDown)
+    return () => document.removeEventListener('mousedown', onDown)
+  }, [open])
+
+  // While editing (query !== null) show what's typed; otherwise show the value.
+  const shown = query === null ? (value || '') : query
+
+  const results = useMemo(() => {
+    const q = (query || '').trim().toLowerCase()
+    const list = q ? options.filter((o) => o.includes(q)) : options
+    return list.slice(0, 100)
+  }, [options, query])
+
+  const commit = (name) => { onChange(name); setQuery(null); setOpen(false) }
+
+  return (
+    <div className="relative" ref={ref}>
+      <input
+        value={shown}
+        disabled={disabled}
+        autoFocus={autoFocus}
+        onFocus={() => { setQuery(value || ''); setOpen(true) }}
+        onChange={(e) => { setQuery(e.target.value); setOpen(true) }}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter' && results.length) { e.preventDefault(); commit(results[0]) }
+          if (e.key === 'Escape') { setOpen(false); setQuery(null) }
+        }}
+        placeholder={placeholder}
+        className="w-full px-3 py-1.5 text-sm rounded-lg border border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-900 focus:outline-none focus:ring-2 focus:ring-zinc-300 dark:focus:ring-zinc-600 disabled:opacity-50"
+      />
+      {open && !disabled && (
+        <div className="absolute z-40 mt-1 w-full max-h-64 overflow-auto bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-lg shadow-2xl p-1">
+          {results.length ? (
+            results.map((name) => (
+              <button
+                key={name}
+                type="button"
+                onClick={() => commit(name)}
+                className={`w-full flex items-center gap-2 px-2 py-1 text-sm rounded-md hover:bg-zinc-100 dark:hover:bg-zinc-700 transition-colors ${
+                  value === name ? 'bg-zinc-100 dark:bg-zinc-700' : ''
+                }`}
+              >
+                <img
+                  src={baseTextureUrl(name)}
+                  alt=""
+                  loading="lazy"
+                  onError={(e) => { e.currentTarget.style.visibility = 'hidden' }}
+                  style={{ width: 20, height: 20, imageRendering: 'pixelated' }}
+                />
+                <span className="truncate">{name}</span>
+              </button>
+            ))
+          ) : (
+            <p className="px-2 py-3 text-xs text-zinc-400 text-center">
+              No items match{query ? ` “${query}”` : ''}.
+            </p>
+          )}
+        </div>
+      )}
+    </div>
+  )
+}
 
 // ---------------------------------------------------------------------------
 // Item manifest helpers
@@ -481,9 +561,17 @@ export const manifestTags = (m) => Object.keys(manifestComponents(m)['minecraft:
 // Component keys beyond the editable few — the "additional data" the editor locks.
 export const manifestExtraKeys = (m) =>
   Object.keys(manifestComponents(m)).filter((k) => !EDITABLE_COMPONENTS.includes(k))
-// A human label for an item (its custom name, else its model stem / base item).
+// Turn a snake_case item id into a Title Cased label: lapis_lazuli → Lapis Lazuli.
+export const prettifyId = (id) =>
+  String(id || '')
+    .replace(/^minecraft:/, '')
+    .replace(/_/g, ' ')
+    .replace(/\b\w/g, (c) => c.toUpperCase())
+
+// A human label for an item: its custom name if it has one, otherwise a
+// prettified form of its model stem / base item (lapis_lazuli → Lapis Lazuli).
 export const manifestLabel = (m) =>
-  plainText(manifestName(m)) || manifestStem(m) || (m && m.base_item) || 'item'
+  plainText(manifestName(m)) || prettifyId(manifestStem(m) || (m && m.base_item)) || 'item'
 
 // Custom + vanilla-fallback texture URLs for an item's slot.
 export function manifestTextures(m) {
@@ -815,6 +903,10 @@ export async function jsonOrThrow(res) {
 export const fetchModels = () =>
   fetch(`${API_BASE}/api/items/models`).then(jsonOrThrow).then((d) => d.models)
 
+// The set of valid vanilla base-item ids (those we have a base texture for).
+export const fetchBaseItems = () =>
+  fetch(`${API_BASE}/api/base-items`).then(jsonOrThrow).then((d) => d.items)
+
 export const fetchItems = () =>
   fetch(`${API_BASE}/api/items`).then(jsonOrThrow).then((d) => d.items)
 
@@ -868,3 +960,28 @@ export const villagerImport = (command) =>
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ command }),
   }).then(jsonOrThrow)
+
+// ---------------------------------------------------------------------------
+// Texture Pack (Dropbox) API client
+// ---------------------------------------------------------------------------
+// Names of custom textures currently in the Unzipped pack: { textures, count }.
+export const fetchTextures = () =>
+  fetch(`${API_BASE}/api/texture/list`).then(jsonOrThrow)
+
+// Upload PNG File objects; the server derives each name and writes the model +
+// item-def JSON alongside. `parent` is 'generated' (flat) or 'handheld' (tool).
+export const uploadTextures = ({ files, parent, overwrite = true }) => {
+  const body = new FormData()
+  files.forEach((f) => body.append('files', f))
+  body.append('parent', parent)
+  body.append('overwrite', overwrite ? 'true' : 'false')
+  return fetch(`${API_BASE}/api/texture/upload`, { method: 'POST', body }).then(jsonOrThrow)
+}
+
+// Repack the Unzipped pack into pack.zip and return { link } for Apex.
+export const syncTexturePack = () =>
+  fetch(`${API_BASE}/api/texture/sync`, { method: 'POST' }).then(jsonOrThrow)
+
+// Preview URL for a custom texture (redirects to a short-lived Dropbox link).
+export const textureThumbUrl = (name) =>
+  `${API_BASE}/api/texture/thumb/${encodeURIComponent(name)}`

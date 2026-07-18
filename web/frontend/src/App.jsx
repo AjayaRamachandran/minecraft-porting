@@ -1,10 +1,10 @@
 import { useState, useEffect } from 'react'
-import { RefreshCw, Bot, Package, Store } from 'lucide-react'
-import { SunIcon, MoonIcon } from './icons'
+import { RefreshCw, Bot, Package, Store, Image } from 'lucide-react'
 import ConverterView from './ConverterView'
 import NpcMaker from './NpcMaker'
 import VillagerMaker from './VillagerMaker'
 import ItemLibrary from './ItemLibrary'
+import TexturePack from './TexturePack'
 
 // Left-rail tools. This is the top hierarchical level — one above the
 // page-level horizontal tabs inside the converter (Command vs Schematic).
@@ -13,20 +13,19 @@ const TOOLS = [
   { key: 'npc', label: 'NPC Maker', icon: Bot, Component: NpcMaker },
   { key: 'villager', label: 'Villager Maker', icon: Store, Component: VillagerMaker },
   { key: 'items', label: 'Item Library', icon: Package, Component: ItemLibrary },
+  { key: 'texturepack', label: 'Texture Pack', icon: Image, Component: TexturePack },
 ]
 
 export default function App() {
-  const [dark, setDark] = useState(() =>
-    typeof window !== 'undefined' && window.matchMedia('(prefers-color-scheme: dark)').matches
-  )
   const [tool, setTool] = useState(() => {
     const seg = window.location.pathname.replace(/^\//, '').split('/')[0]
     return TOOLS.find((t) => t.key === seg) ? seg : 'converter'
   })
 
   useEffect(() => {
-    document.documentElement.classList.toggle('dark', dark)
-  }, [dark])
+    // Force dark mode app-wide; light mode is disabled.
+    document.documentElement.classList.add('dark')
+  }, [])
 
   const navigate = (key) => {
     setTool(key)
@@ -73,16 +72,6 @@ export default function App() {
             </button>
           ))}
         </nav>
-        <div className="p-2 border-t border-zinc-200 dark:border-zinc-800">
-          <button
-            onClick={() => setDark((d) => !d)}
-            className="w-full flex items-center gap-2.5 px-3 py-2 text-sm rounded-lg text-zinc-500 dark:text-zinc-400 hover:text-zinc-800 dark:hover:text-zinc-200 hover:bg-zinc-50 dark:hover:bg-zinc-900 transition-colors"
-            aria-label="Toggle dark mode"
-          >
-            {dark ? <SunIcon /> : <MoonIcon />}
-            {dark ? 'Light mode' : 'Dark mode'}
-          </button>
-        </div>
       </aside>
 
       {/* Main content */}
