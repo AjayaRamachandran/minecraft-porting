@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo, useRef } from 'react'
-import { Plus, Trash2, Copy, Check, X, Package, Search, ArrowRight, Minus, Upload } from 'lucide-react'
+import { Plus, Trash2, Copy, Check, X, Package, Search, ArrowRight, Minus, Upload, GripVertical } from 'lucide-react'
 import {
   API_BASE, ItemSlot, BaseItemPicker, RichTextEditor, FormattedLine, textureUrl, baseTextureUrl, resolveColor,
   buildGivePayload, fetchItems, fetchBaseItems, villagerGiveCommand, villagerImport,
@@ -131,6 +131,9 @@ function TradeSlot({ item, label, tradeId, slotKey, baseItems, onDrop, onClear, 
     <div className="relative flex flex-col items-center gap-1" ref={ref}>
       <div
         onDragOver={(e) => {
+          // A trade-row reorder drag isn't a slot drop target — let it bubble
+          // to the row so the row-level handler drives the reorder.
+          if (e.dataTransfer.types.includes('application/x-mc-trade')) return
           e.preventDefault()
           // Slot-to-slot drags move by default and copy with Ctrl/Cmd; library
           // drags are always copies. `types` is readable during dragover (data
@@ -247,6 +250,8 @@ export default function VillagerMaker() {
   const [importText, setImportText] = useState('')
   const [importError, setImportError] = useState('')
   const [importing, setImporting] = useState(false)
+  const [dragTradeId, setDragTradeId] = useState(null) // trade row being dragged
+  const [overTradeId, setOverTradeId] = useState(null) // trade row hovered as drop target
 
   useEffect(() => {
     fetchItems().then(setLibrary).catch(() => setLibrary([]))
@@ -302,6 +307,20 @@ export default function VillagerMaker() {
     }))
   const addTrade = () => setState((s) => ({ ...s, trades: [...s.trades, newTrade()] }))
   const deleteTrade = (id) => setState((s) => ({ ...s, trades: s.trades.filter((t) => t.id !== id) }))
+
+  // Reorder: pull the dragged trade out and re-insert it at the target's index.
+  const moveTrade = (fromId, toId) => {
+    if (fromId === toId) return
+    setState((s) => {
+      const from = s.trades.findIndex((t) => t.id === fromId)
+      const to = s.trades.findIndex((t) => t.id === toId)
+      if (from < 0 || to < 0) return s
+      const next = s.trades.slice()
+      const [moved] = next.splice(from, 1)
+      next.splice(to, 0, moved)
+      return { ...s, trades: next }
+    })
+  }
 
   const onDropSlot = (id, key, e) => {
     // Slot-to-slot drag: move the item (default) or copy it (Ctrl/Cmd held).
@@ -460,8 +479,51 @@ export default function VillagerMaker() {
             {state.trades.map((t, i) => (
               <div
                 key={t.id}
-                className="flex items-center gap-2 sm:gap-3 bg-zinc-100 dark:bg-zinc-900/50 border border-zinc-300 dark:border-zinc-700 rounded-lg px-3 py-2.5"
+                // Only the grip handle sets `draggable`, so slot drags inside the
+                // row keep working. The row is a drop target for the row payload
+                // only — slot/item drops carry other types and pass through to
+                // the slots' own handlers.
+                onDragStart={(e) => {
+                  // Ignore drags bubbling up from the slots — only the grip
+                  // handle initiates a row reorder.
+                  if (!e.target.closest('[data-trade-handle]')) return
+                  e.dataTransfer.setData('application/x-mc-trade', t.id)
+                  e.dataTransfer.effectAllowed = 'move'
+                  setDragTradeId(t.id)
+                }}
+                onDragEnd={() => { setDragTradeId(null); setOverTradeId(null) }}
+                onDragOver={(e) => {
+                  if (!e.dataTransfer.types.includes('application/x-mc-trade')) return
+                  e.preventDefault()
+                  e.dataTransfer.dropEffect = 'move'
+                  if (overTradeId !== t.id) setOverTradeId(t.id)
+                }}
+                onDragLeave={(e) => {
+                  if (!e.currentTarget.contains(e.relatedTarget)) setOverTradeId((id) => (id === t.id ? null : id))
+                }}
+                onDrop={(e) => {
+                  const fromId = e.dataTransfer.getData('application/x-mc-trade')
+                  if (!fromId) return // slot/item drop — handled by the slot
+                  e.preventDefault()
+                  moveTrade(fromId, t.id)
+                  setDragTradeId(null)
+                  setOverTradeId(null)
+                }}
+                className={`flex items-center gap-2 sm:gap-3 bg-zinc-100 dark:bg-zinc-900/50 border rounded-lg px-3 py-2.5 transition-all ${
+                  overTradeId === t.id && dragTradeId !== t.id
+                    ? 'border-amber-400 dark:border-amber-500 ring-2 ring-amber-400 dark:ring-amber-500'
+                    : 'border-zinc-300 dark:border-zinc-700'
+                } ${dragTradeId === t.id ? 'opacity-40' : ''}`}
               >
+                <button
+                  draggable
+                  data-trade-handle
+                  className="shrink-0 cursor-grab active:cursor-grabbing p-0.5 -ml-1 rounded text-zinc-300 dark:text-zinc-600 hover:text-zinc-500 dark:hover:text-zinc-400 hover:bg-zinc-200 dark:hover:bg-zinc-700 transition-colors"
+                  title="Drag to reorder trade"
+                  aria-label="Drag to reorder trade"
+                >
+                  <GripVertical size={14} />
+                </button>
                 <span className="text-xs font-semibold text-zinc-400 dark:text-zinc-500 w-5 shrink-0 text-center">{i + 1}</span>
                 <TradeSlot
                   item={t.buy}
