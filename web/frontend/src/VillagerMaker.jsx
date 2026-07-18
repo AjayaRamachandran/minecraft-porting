@@ -1,14 +1,31 @@
-import { useState, useEffect, useMemo } from 'react'
+import { useState, useEffect, useMemo, useRef } from 'react'
 import { Plus, Trash2, Copy, Check, X, Package, Search, ArrowRight, Minus, Upload } from 'lucide-react'
 import {
-  API_BASE, ItemSlot, RichTextEditor, FormattedLine, textureUrl, baseTextureUrl, resolveColor,
-  buildGivePayload, fetchItems, villagerGiveCommand, villagerImport,
-  manifestStem, manifestName, manifestLore, manifestLabel, manifestTextures,
+  API_BASE, ItemSlot, BaseItemPicker, RichTextEditor, FormattedLine, textureUrl, baseTextureUrl, resolveColor,
+  buildGivePayload, fetchItems, fetchBaseItems, villagerGiveCommand, villagerImport,
+  manifestStem, manifestName, manifestLore, manifestLabel, manifestTextures, prettifyId,
   plainText, lineToComponent,
 } from './mc'
 
+// Collision-proof trade ids. A plain counter breaks across a sessionStorage
+// reload: the counter resets to 0 while restored trades keep their old ids, so
+// a freshly-added trade could reuse an existing id and the two would then share
+// every field edit. randomUUID avoids that entirely.
 let _uid = 0
-const uid = () => `v${++_uid}`
+const uid = () =>
+  `v${globalThis.crypto?.randomUUID?.() ?? `${++_uid}-${Date.now()}`}`
+
+// Re-key trades so every id is unique — repairs any state persisted before the
+// id fix (which could contain duplicates) and guards imports.
+const withUniqueIds = (trades) => {
+  const seen = new Set()
+  return (trades || []).map((t) => {
+    let id = t.id
+    if (!id || seen.has(id)) id = uid()
+    seen.add(id)
+    return t.id === id ? t : { ...t, id }
+  })
+}
 
 const DEFAULT_MAX_USES = 99999999
 
@@ -68,7 +85,7 @@ function slotItemFromJson(it) {
   if (!it || !it.base_item) return null
   const comps = it.components || {}
   const stem = String(comps['minecraft:item_model'] || '').replace(/^minecraft:custom\//, '')
-  const label = plainText(comps['minecraft:custom_name']) || stem || it.base_item || 'item'
+  const label = plainText(comps['minecraft:custom_name']) || prettifyId(stem || it.base_item) || 'item'
   return { base_item: it.base_item, count: it.count || 1, components: comps, _stem: stem || null, _label: label }
 }
 
@@ -95,34 +112,66 @@ const blankState = () => ({
   trades: [newTrade()],
 })
 
-// One draggable / clearable trade slot with a quantity stepper.
-function TradeSlot({ item, label, onDrop, onClear, onCount }) {
+// One draggable / clearable trade slot with a quantity stepper. Besides
+// accepting a dragged library item, an empty slot can be clicked to search the
+// vanilla base items and drop a plain base-game item in.
+function TradeSlot({ item, label, tradeId, slotKey, baseItems, onDrop, onClear, onCount, onPickBase }) {
   const [over, setOver] = useState(false)
+  const [picking, setPicking] = useState(false)
+  const ref = useRef(null)
+
+  useEffect(() => {
+    if (!picking) return
+    const onDown = (e) => { if (ref.current && !ref.current.contains(e.target)) setPicking(false) }
+    document.addEventListener('mousedown', onDown)
+    return () => document.removeEventListener('mousedown', onDown)
+  }, [picking])
+
   return (
-    <div className="flex flex-col items-center gap-1">
+    <div className="relative flex flex-col items-center gap-1" ref={ref}>
       <div
-        onDragOver={(e) => { e.preventDefault(); e.dataTransfer.dropEffect = 'copy'; setOver(true) }}
+        onDragOver={(e) => {
+          e.preventDefault()
+          // Slot-to-slot drags move by default and copy with Ctrl/Cmd; library
+          // drags are always copies. `types` is readable during dragover (data
+          // isn't), so key the cursor off the payload type.
+          const isSlot = e.dataTransfer.types.includes('application/x-mc-slot')
+          e.dataTransfer.dropEffect = isSlot && !(e.ctrlKey || e.metaKey) ? 'move' : 'copy'
+          setOver(true)
+        }}
         onDragLeave={(e) => { if (!e.currentTarget.contains(e.relatedTarget)) setOver(false) }}
         onDrop={(e) => { e.preventDefault(); setOver(false); onDrop(e) }}
+        onClick={item ? undefined : () => setPicking((p) => !p)}
         className={`relative rounded transition-all ${over ? 'ring-2 ring-amber-400 dark:ring-amber-500' : ''}`}
       >
         {item ? (
-          <div className="relative">
+          <div
+            className="relative cursor-grab active:cursor-grabbing"
+            draggable
+            onDragStart={(e) => {
+              e.dataTransfer.setData(
+                'application/x-mc-slot',
+                JSON.stringify({ from: { id: tradeId, key: slotKey }, item }),
+              )
+              e.dataTransfer.effectAllowed = 'copyMove'
+            }}
+          >
             <ItemSlot
               texture={item._stem ? textureUrl(item._stem) : null}
               fallbackTexture={baseTextureUrl(item.base_item)}
-              name={item.components['minecraft:custom_name'] || { text: item._label }}
+              name={item.components['minecraft:custom_name'] || { text: prettifyId(item._label) }}
+              nameItalic={!!item.components['minecraft:custom_name']}
               lore={item.components['minecraft:lore'] || []}
               size={48}
-              title={item._label}
+              title={prettifyId(item._label)}
             />
             {item.count > 1 && (
-              <span className="absolute bottom-0 right-0 text-[11px] font-bold px-0.5 bg-black/70 text-white leading-none">
+              <span className="absolute bottom-1 right-1 text-[13px] px-0.5 text-white drop-shadow-[2px_2px_0_black] leading-none">
                 {item.count}
               </span>
             )}
             <button
-              onClick={onClear}
+              onClick={(e) => { e.stopPropagation(); onClear() }}
               className="absolute -top-1.5 -right-1.5 p-0.5 rounded bg-red-600 text-white hover:bg-red-500"
               title="Clear slot"
             >
@@ -131,10 +180,11 @@ function TradeSlot({ item, label, onDrop, onClear, onCount }) {
           </div>
         ) : (
           <div
-            className={`flex items-center justify-center border-2 border-dashed text-[9px] leading-tight text-center px-1 transition-colors ${
+            title="Drag an item here, or click to pick a base item"
+            className={`flex items-center justify-center border-2 border-dashed text-[9px] leading-tight text-center px-1 cursor-pointer transition-colors ${
               over
                 ? 'border-amber-400 bg-amber-50/60 dark:bg-amber-950/30 text-amber-600'
-                : 'border-zinc-300 dark:border-zinc-600 text-zinc-400'
+                : 'border-zinc-300 dark:border-zinc-600 text-zinc-400 hover:border-zinc-400 dark:hover:border-zinc-500'
             }`}
             style={{ width: 48, height: 48 }}
           >
@@ -142,6 +192,18 @@ function TradeSlot({ item, label, onDrop, onClear, onCount }) {
           </div>
         )}
       </div>
+      {picking && (
+        <div className="absolute z-40 top-full mt-1 left-1/2 -translate-x-1/2 w-52">
+          <BaseItemPicker
+            options={baseItems}
+            value=""
+            autoFocus
+            startOpen
+            placeholder="search base items…"
+            onChange={(name) => { setPicking(false); if (name) onPickBase(name) }}
+          />
+        </div>
+      )}
       {item && (
         <div className="flex items-center gap-0.5">
           <button
@@ -167,11 +229,15 @@ export default function VillagerMaker() {
   const [state, setState] = useState(() => {
     try {
       const saved = sessionStorage.getItem('villager_draft')
-      if (saved) return JSON.parse(saved)
+      if (saved) {
+        const parsed = JSON.parse(saved)
+        return { ...parsed, trades: withUniqueIds(parsed.trades) }
+      }
     } catch { /* ignore parse errors */ }
     return blankState()
   })
   const [library, setLibrary] = useState([])
+  const [baseItems, setBaseItems] = useState([])
   const [libQuery, setLibQuery] = useState('')
   const [command, setCommand] = useState('')
   const [cmdError, setCmdError] = useState('')
@@ -184,6 +250,7 @@ export default function VillagerMaker() {
 
   useEffect(() => {
     fetchItems().then(setLibrary).catch(() => setLibrary([]))
+    fetchBaseItems().then(setBaseItems).catch(() => setBaseItems([]))
   }, [])
 
   useEffect(() => {
@@ -237,10 +304,35 @@ export default function VillagerMaker() {
   const deleteTrade = (id) => setState((s) => ({ ...s, trades: s.trades.filter((t) => t.id !== id) }))
 
   const onDropSlot = (id, key, e) => {
+    // Slot-to-slot drag: move the item (default) or copy it (Ctrl/Cmd held).
+    const slotRaw = e.dataTransfer.getData('application/x-mc-slot')
+    if (slotRaw) {
+      try {
+        const { from, item } = JSON.parse(slotRaw)
+        if (from.id === id && from.key === key) return // dropped onto itself
+        const copy = e.ctrlKey || e.metaKey
+        setState((s) => ({
+          ...s,
+          trades: s.trades.map((t) => {
+            let next = t
+            if (t.id === id) next = { ...next, [key]: item }
+            if (!copy && t.id === from.id) next = { ...next, [from.key]: null }
+            return next
+          }),
+        }))
+      } catch { /* malformed drop */ }
+      return
+    }
+    // Library drag: always a copy of the manifest item.
     const raw = e.dataTransfer.getData('application/x-mc-item')
     if (!raw) return
     try { setSlot(id, key, slotItemFromManifest(JSON.parse(raw))) } catch { /* malformed drop */ }
   }
+
+  // Fill a slot with a plain base-game item (no custom model / components),
+  // chosen by clicking the slot and picking from the base-item list.
+  const setSlotBase = (id, key, name) =>
+    setSlot(id, key, { base_item: name, count: 1, components: {}, _stem: null, _label: prettifyId(name) })
 
   const copyCommand = async () => {
     await navigator.clipboard.writeText(command)
@@ -356,7 +448,7 @@ export default function VillagerMaker() {
 
       <div className="flex flex-col lg:flex-row gap-5 items-start">
         {/* ---- Trade box (Minecraft villager GUI layout) ---- */}
-        <div className="flex-1 min-w-0 bg-[#c6c6c6] dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 rounded-xl overflow-hidden">
+        <div className="flex-1 min-w-0 bg-[#c6c6c6] dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 rounded-xl">
           <div className="px-4 py-2 bg-zinc-200 dark:bg-zinc-900/60 border-b border-zinc-300 dark:border-zinc-700">
             <div className="text-sm font-semibold text-zinc-700 dark:text-zinc-200">
               {hasName ? <FormattedLine value={namePreview} /> : 'Villager'}
@@ -374,24 +466,36 @@ export default function VillagerMaker() {
                 <TradeSlot
                   item={t.buy}
                   label="buy"
+                  tradeId={t.id}
+                  slotKey="buy"
+                  baseItems={baseItems}
                   onDrop={(e) => onDropSlot(t.id, 'buy', e)}
                   onClear={() => setSlot(t.id, 'buy', null)}
                   onCount={(c) => setSlotCount(t.id, 'buy', c)}
+                  onPickBase={(name) => setSlotBase(t.id, 'buy', name)}
                 />
                 <TradeSlot
                   item={t.buyB}
                   label="buy 2"
+                  tradeId={t.id}
+                  slotKey="buyB"
+                  baseItems={baseItems}
                   onDrop={(e) => onDropSlot(t.id, 'buyB', e)}
                   onClear={() => setSlot(t.id, 'buyB', null)}
                   onCount={(c) => setSlotCount(t.id, 'buyB', c)}
+                  onPickBase={(name) => setSlotBase(t.id, 'buyB', name)}
                 />
                 <ArrowRight size={20} className="text-zinc-400 shrink-0" />
                 <TradeSlot
                   item={t.sell}
                   label="sell"
+                  tradeId={t.id}
+                  slotKey="sell"
+                  baseItems={baseItems}
                   onDrop={(e) => onDropSlot(t.id, 'sell', e)}
                   onClear={() => setSlot(t.id, 'sell', null)}
                   onCount={(c) => setSlotCount(t.id, 'sell', c)}
+                  onPickBase={(name) => setSlotBase(t.id, 'sell', name)}
                 />
                 <button
                   onClick={() => deleteTrade(t.id)}
@@ -413,7 +517,7 @@ export default function VillagerMaker() {
         </div>
 
         {/* ---- Villager preview + biome/profession dropdowns ---- */}
-        <div className="w-full lg:w-56 shrink-0 bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-xl p-4 space-y-3">
+        <div className="w-full lg:w-56 shrink-0 lg:sticky lg:top-4 lg:self-start bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-xl p-4 space-y-3">
           <div className="flex items-center justify-center h-48 bg-zinc-100 dark:bg-zinc-900 rounded-lg overflow-hidden">
             {imgFailed ? (
               <span className="text-xs text-zinc-400 px-3 text-center">Preview unavailable</span>

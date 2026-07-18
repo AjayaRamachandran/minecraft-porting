@@ -13,6 +13,7 @@ import {
 } from "lucide-react";
 import {
   ItemSlot,
+  BaseItemPicker,
   RichTextEditor,
   lineToComponent,
   plainText,
@@ -26,6 +27,7 @@ import {
   manifestLabel,
   manifestTextures,
   fetchModels,
+  fetchBaseItems,
   fetchItems,
   createItem,
   updateItem,
@@ -188,6 +190,23 @@ function TexturePicker({ models, value, onPick, disabled }) {
             placeholder="Search textures…"
             className="w-full px-2 py-1.5 text-sm rounded-md border border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-900 focus:outline-none focus:ring-2 focus:ring-zinc-300 dark:focus:ring-zinc-600"
           />
+          {/* Clear the custom model so the item uses its base item's own texture. */}
+          <button
+            type="button"
+            onClick={() => {
+              onPick(null);
+              setOpen(false);
+            }}
+            className={`mt-2 w-full flex items-center gap-2 px-2 py-1.5 text-sm rounded-md hover:bg-zinc-100 dark:hover:bg-zinc-700 transition-colors ${
+              value ? "" : "bg-zinc-100 dark:bg-zinc-700"
+            }`}
+          >
+            <span className="flex items-center justify-center shrink-0 border border-dashed border-zinc-300 dark:border-zinc-600 text-zinc-400" style={{ width: 20, height: 20 }}>
+              <X size={12} />
+            </span>
+            <span>Base Texture</span>
+            <span className="text-xs text-zinc-400">— use the base item’s own texture</span>
+          </button>
           <div className="mt-2 grid grid-cols-6 gap-2 max-h-96 overflow-auto">
             {results.map((m) => (
               <button
@@ -327,6 +346,7 @@ function ImportModal({ onClose, onImported }) {
 
 export default function ItemLibrary() {
   const [models, setModels] = useState([]);
+  const [baseItems, setBaseItems] = useState([]);
   const [items, setItems] = useState([]);
   const [draft, setDraft] = useState(blankDraft);
   const [status, setStatus] = useState("idle"); // idle | saving | error
@@ -339,6 +359,9 @@ export default function ItemLibrary() {
   useEffect(() => {
     fetchModels()
       .then(setModels)
+      .catch((e) => setError(e.message));
+    fetchBaseItems()
+      .then(setBaseItems)
       .catch((e) => setError(e.message));
     fetchItems()
       .then(setItems)
@@ -478,11 +501,11 @@ export default function ItemLibrary() {
                 value={draft.model_stem}
                 disabled={hasAdditional}
                 onPick={(m) =>
-                  setDraft((d) => ({
-                    ...d,
-                    model_stem: m.stem,
-                    base_item: m.base_item,
-                  }))
+                  setDraft((d) =>
+                    m
+                      ? { ...d, model_stem: m.stem, base_item: m.base_item }
+                      : { ...d, model_stem: "" },
+                  )
                 }
               />
             </label>
@@ -493,14 +516,14 @@ export default function ItemLibrary() {
                   <span className="text-zinc-400">(auto)</span>
                 )}
               </span>
-              <input
+              <BaseItemPicker
                 value={draft.base_item}
+                options={baseItems}
                 disabled={hasAdditional}
-                onChange={(e) =>
-                  setDraft((d) => ({ ...d, base_item: e.target.value.trim() }))
+                onChange={(name) =>
+                  setDraft((d) => ({ ...d, base_item: name }))
                 }
                 placeholder="auto from texture"
-                className="w-full px-3 py-1.5 text-sm rounded-lg border border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-900 focus:outline-none focus:ring-2 focus:ring-zinc-300 dark:focus:ring-zinc-600 disabled:opacity-50"
               />
             </label>
           </div>
